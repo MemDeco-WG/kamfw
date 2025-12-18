@@ -4,8 +4,8 @@
 # KAM framework- Cross-Root Manager Utility Library
 # 跨 Root 管理器工具框架--模块开发辅助库
 #
-##########################################################################################
-export MODDIR=${MODPATH:-${0%/*}}
+##########################################################################################export MODDIR=${MODPATH:-${0%/*}}
+
 # 环境变量
 export PATH=${MODDIR}/.local/bin/:$PATH：/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin
 export LD_LIBRARY_PATH=${MODDIR}/.local/lib/:$LD_LIBRARY_PATH:/data/data/com.termux/files/usr/lib
@@ -49,7 +49,6 @@ _kamfw_load () {
         print "Error: Module '$1' not found"
     fi
 }
-
 
 _kamfw_list () {
     print "Available modules:"
@@ -97,3 +96,4 @@ import() { kamfw load "$@"; }
 if [ -n "${PS1:-}" ]; then
   alias import='kamfw load'
 fi
+import base
