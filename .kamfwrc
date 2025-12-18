@@ -4,7 +4,8 @@
 # KAM framework- Cross-Root Manager Utility Library
 # 跨 Root 管理器工具框架--模块开发辅助库
 #
-##########################################################################################export MODDIR=${MODPATH:-${0%/*}}
+##########################################################################################
+export MODDIR=${MODPATH:-${0%/*}}
 
 # 环境变量
 export PATH=${MODDIR}/.local/bin/:$PATH：/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin
@@ -13,6 +14,13 @@ export HOME=${MODDIR}
 
 export KAMFW_DIR=${MODDIR}/lib/kamfw
 export KAM_MODULES=${KAM_MODULES:-""}
+
+# Load persisted language override (if present).
+# This file is written by the `select_language` helper (created below).
+# When present it will export `KAM_LANG` so the i18n system picks it up.
+if [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
+    . "${KAMFW_DIR}/.kamfw_lang"
+fi
 
 # =============================================================================
 # 基础函数
@@ -96,4 +104,33 @@ import() { kamfw load "$@"; }
 if [ -n "${PS1:-}" ]; then
   alias import='kamfw load'
 fi
+
+
+
+# =============================================================================
+# Language selection helpers (moved to module)
+# =============================================================================
+# Language helper functions have been moved out of the core config into a
+# dedicated module so that they can be loaded on demand:
+#
+#   - module file: lib/kamfw/lang.sh
+#   - import it where needed:  import lang
+#
+# The module persists the override to: ${KAMFW_DIR}/.kamfw_lang
+# (Use `select_language`, `set_kam_language`/`set_lang`, `unset_kam_language`/`unset_lang`.)
+
+# Keep existing behavior by importing the base module last
 import base
+import i18n
+
+if is_magisk; then
+    import magisk
+fi
+
+if is_ksu; then
+    import ksu
+fi
+
+if is_ap; then
+    import ap
+fi

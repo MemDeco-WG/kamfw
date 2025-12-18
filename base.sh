@@ -10,6 +10,8 @@ export COL_RST='\033[0m'
 
 info () {
     print "${COL_GRN}$1${COL_RST}"
+    # also write to module log (colors are stripped by log())
+    log "INFO: $1"
 }
 
 green () {
@@ -18,6 +20,8 @@ green () {
 
 error () {
     print "${COL_RED}$1${COL_RST}"
+    # also write to module log
+    log "ERROR: $1"
 }
 
 red() {
@@ -26,6 +30,8 @@ red() {
 
 warn () {
     print "${COL_YLW}$1${COL_RST}"
+    # also write to module log
+    log "WARN: $1"
 }
 
 yellow() {
@@ -34,16 +40,105 @@ yellow() {
 
 success () {
     print "${COL_GRN}$1${COL_RST}"
+    # also write to module log
+    log "SUCCESS: $1"
 }
 
 debug() {
     if [ "${KAM_DEBUG:-0}" = "1" ]; then
         print "${COL_CYN}[DEBUG] $1${COL_RST}"
+        # only log debug messages when debug is enabled
+        log "[DEBUG] $1"
     fi
 }
 
 cyan() {
     print "${COL_CYN}$1${COL_RST}"
+}
+
+
+log() {
+    # Set sensible defaults using parameter default assignment:
+    # - prefer existing MODDIR, otherwise use dirname of $0
+    # - default KAM_LOGFILE to "$MODDIR/kam.log" (overridable)
+    : "${MODDIR:=${0%/*}}"
+    : "${KAM_LOGFILE:=${MODDIR}/kam.log}"
+    _logfile="${KAM_LOGFILE}"
+    _mode="append"
+    _rotate_opt=""
+    _rotate_bytes=0
+
+    # simple opts: -w (--overwrite), -f/--file <path>, -r|--rotate <size>
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            -w|--overwrite) _mode="overwrite"; shift ;;
+            -f|--file) _logfile="$2"; shift 2 ;;
+            -r|--rotate|--rotate-size) _rotate_opt="$2"; shift 2 ;;
+            *) break ;;
+        esac
+    done
+
+    # Fallback to env var if not passed via options
+    if [ -z "${_rotate_opt:-}" ] && [ -n "${KAM_LOG_ROTATE_SIZE:-}" ]; then
+        _rotate_opt="${KAM_LOG_ROTATE_SIZE}"
+    fi
+
+    # Parse rotate size (supports K/M/G suffixes). Non-numeric -> disabled.
+    if [ -n "${_rotate_opt:-}" ]; then
+        case "${_rotate_opt}" in
+            *[kK]) _num="${_rotate_opt%[kK]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1024)) ;; esac ;;
+            *[mM]) _num="${_rotate_opt%[mM]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1048576)) ;; esac ;;
+            *[gG]) _num="${_rotate_opt%[gG]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1073741824)) ;; esac ;;
+            *) case "${_rotate_opt}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_rotate_opt)) ;; esac ;;
+        esac
+    fi
+
+    if [ "$_mode" = "overwrite" ]; then
+        : > "$_logfile" 2>/dev/null || true
+    fi
+
+    # helper: rotate if file is too big (AB rotation: keep .b as backup)
+    _maybe_rotate() {
+        if [ "${_rotate_bytes:-0}" -le 0 ]; then
+            return 0
+        fi
+        if [ -f "$_logfile" ]; then
+            _cur_size=$(wc -c < "$_logfile" 2>/dev/null || echo 0)
+            if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
+                _bak="${_logfile}.b"
+                rm -f "$_bak" 2>/dev/null || true
+                mv "$_logfile" "$_bak" 2>/dev/null || true
+                : > "$_logfile" 2>/dev/null || true
+            fi
+        fi
+    }
+
+    # helper to write one line (strip ANSI colors, prefix timestamp)
+    _write_line() {
+        _line="$1"
+        _clean=$(printf '%s' "$_line" | sed 's/\x1b\[[0-9;]*m//g')
+        _maybe_rotate
+        printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >> "$_logfile"
+    }
+
+    # Prefer explicit args over piped stdin. If no args and stdin has data,
+    # read stdin line-by-line and write each line.
+    if [ "$#" -gt 0 ]; then
+        _msg="$*"
+        _write_line "$_msg"
+    else
+        if [ -t 0 ]; then
+            # stdin is a terminal -> no piped input; nothing to write
+            :
+        else
+            while IFS= read -r _ln || [ -n "$_ln" ]; do
+                _write_line "$_ln"
+            done
+        fi
+    fi
+
+    # cleanup helper symbols
+    unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
 }
 
 wait_key() {

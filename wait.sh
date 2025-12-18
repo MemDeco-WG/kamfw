@@ -14,6 +14,13 @@ wait_boot() {
     [ -n "$1" ] && sleep "$1"
 }
 
+wait_boot_if_magisk() {
+    if is_magisk; then
+        wait_boot
+    fi
+    exit 0
+}
+
 # 等待用户解锁 / SDCard 挂载
 # 用法: wait_unlock [延迟秒数]
 wait_unlock() {

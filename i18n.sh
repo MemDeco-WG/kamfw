@@ -108,6 +108,15 @@ set_i18n "REFUSE"    "zh" "残忍拒绝" "en" "Refuse" "ja" "拒否" "ko" "거�
 set_i18n "SUCCESS"   "zh" "成功" "en" "Success" "ja" "成功" "ko" "성공"
 set_i18n "FAILED"    "zh" "失败" "en" "Failed" "ja" "失敗" "ko" "실패"
 
+# ask/choose guidance (used by `ask` via `guide`)
+set_i18n "ASK_GUIDE_TITLE" "zh" "操作提示" "en" "How to use" "ja" "使い方" "ko" "사용 방법"
+set_i18n "ASK_GUIDE_CONTENT" \
+    "zh" "音量键：音量减切换选项（循环），音量加确认并执行。" \
+    "en" "Volume keys: Volume Down cycles options (wraps around); Volume Up confirms and executes." \
+    "ja" "音量キー：ボリュームダウンで選択肢を切替（ループします）、音量アップで選択を確定して実行します。" \
+    "ko" "볼륨 키: 볼륨 작게로 항목 전환(반복), 볼륨 크게로 선택 확인 및 실행합니다."
+
+
 # 调试相关
 set_i18n "DEBUG_MODE"   "zh" "是否开启调试模式？" "en" "Enable debug mode?" "ja" "デバッグモードを有効にしますか？" "ko" "디버그 모드를 활성화하시겠습니까?"
 set_i18n "DEBUG_ON"     "zh" "调试模式已开启" "en" "Debug mode enabled" "ja" "デバッグモードが有効になりました" "ko" "디버그 모드가 활성화되었습니다"
@@ -116,3 +125,13 @@ set_i18n "DEBUG_STATUS" "zh" "调试模式状态" "en" "Debug status" "ja" "デ�
 
 # 社交/支持
 set_i18n "FEED_STAR" "zh" "投喂星光" "en" "Feed star" "ja" "星を餌付け" "ko" "별에게 먹이를 주세요"
+
+# i18n labels (shell UI)
+set_i18n "SWITCH_LANGUAGE" "zh" "切换语言"    "en" "Switch Language"  "ja" "言語切替"           "ko" "언어 전환"
+set_i18n "LANG_AUTO"       "zh" "自动(系统)"  "en" "Auto (system)"    "ja" "自動(システム)"      "ko" "자동(시스템)"
+set_i18n "LANG_EN"         "zh" "英文"       "en" "English"          "ja" "英語"               "ko" "영어"
+set_i18n "LANG_ZH"         "zh" "中文"       "en" "Chinese"          "ja" "中国語"             "ko" "중국어"
+set_i18n "LANG_JA"         "zh" "日语"       "en" "Japanese"         "ja" "日本語"             "ko" "일본어"
+set_i18n "LANG_KO"         "zh" "韩语"       "en" "Korean"           "ja" "韓国語"             "ko" "한국어"
+set_i18n "LANG_SAVE"       "zh" "语言已保存"  "en" "Language saved"   "ja" "言語が保存されました" "ko" "언어가 저장되었습니다"
+set_i18n "LANG_SAVE_ERROR" "zh" "保存失败"    "en" "Operation failed" "ja" "操作に失敗しました"   "ko" "작업 실패"
