@@ -132,9 +132,8 @@ mihomo_start() {
         return 1
     else
         mihomo_tun
-        mihomo
-        is_mihomo_running || return 1
-        return 0
+        mihomo &
+        is_mihomo_running
     fi
 }
 
