@@ -55,16 +55,16 @@ EOF
         return 1
     fi
 
-    # Pick a storage root; prefer KernelSU path (if writable) then module-local then /data/local/tmp
-    for _root in "/data/adb/ksu/module_configs" "$MODDIR/.module_configs" "/data/local/tmp/ksu_module_configs" "/tmp/ksu_module_configs"; do
-        _store="$_root/$_module_id"
-        if mkdir -p "$_store" 2>/dev/null; then
-            _persist="$_store/persist"
-            _tmp="$_store/tmp"
-            mkdir -p "$_persist" "$_tmp" 2>/dev/null || true
-            break
-        fi
-    done
+    # Use KernelSU path for storage
+    _root="/data/adb/ksu/module_configs"
+    _store="$_root/$_module_id"
+    mkdir -p "$_store" || {
+        error "Unable to create config directory: $_store"
+        return 1
+    }
+    _persist="$_store/persist"
+    _tmp="$_store/tmp"
+    mkdir -p "$_persist" "$_tmp"
 
     # Validate key according to ^[a-zA-Z][a-zA-Z0-9._-]+$ and length constraints
     _validate_key() {
@@ -132,29 +132,20 @@ EOF
             _validate_key "$_key" || return 1
 
             # Prepare value into a temp file (support --stdin or piped/missing value)
+            _tf=$(mktemp) || {
+                error "mktemp command failed"
+                return 1
+            }
+            
             if [ "$_stdin" = true ]; then
-                if command -v mktemp >/dev/null 2>&1; then
-                    _tf=$(mktemp) || _tf="/tmp/ksu_cfg.$$"
-                else
-                    _tf="/tmp/ksu_cfg.$$"
-                fi
                 cat - > "$_tf"
             elif [ $# -eq 0 ] && [ ! -t 0 ]; then
-                if command -v mktemp >/dev/null 2>&1; then
-                    _tf=$(mktemp) || _tf="/tmp/ksu_cfg.$$"
-                else
-                    _tf="/tmp/ksu_cfg.$$"
-                fi
                 cat - > "$_tf"
             else
                 if [ $# -gt 0 ]; then
-                    if command -v mktemp >/dev/null 2>&1; then
-                        _tf=$(mktemp) || _tf="/tmp/ksu_cfg.$$"
-                    else
-                        _tf="/tmp/ksu_cfg.$$"
-                    fi
                     printf '%s' "$*" > "$_tf"
                 else
+                    rm -f "$_tf" 2>/dev/null || true
                     error "Missing value for set"
                     return 1
                 fi

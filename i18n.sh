@@ -109,12 +109,12 @@ set_i18n "SUCCESS"   "zh" "成功" "en" "Success" "ja" "成功" "ko" "성공"
 set_i18n "FAILED"    "zh" "失败" "en" "Failed" "ja" "失敗" "ko" "실패"
 
 # ask/choose guidance (used by `ask` via `guide`)
-set_i18n "ASK_GUIDE_TITLE" "zh" "操作提示" "en" "How to use" "ja" "使い方" "ko" "사용 방법"
+set_i18n "ASK_GUIDE_TITLE" "zh" "🔉🔊" "en" "🔉🔊" "ja" "🔉🔊" "ko" "🔉🔊"
 set_i18n "ASK_GUIDE_CONTENT" \
-    "zh" "🔉 音量减：切换选项（循环）\n🔊 音量加：确认并执行" \
-    "en" "🔉 Volume Down: Cycle options (wraps around)\n🔊 Volume Up: Confirm and execute" \
-    "ja" "🔉 ボリュームダウン：選択肢を切替（ループ）\n🔊 ボリュームアップ：選択を確定して実行" \
-    "ko" "🔉 볼륨 작게：항목 전환(반복)\n🔊 볼륨 크게：선택 확인 및 실행"
+    "zh" "🔉 🔄\n🔊 ✅" \
+    "en" "🔉 🔄\n🔊 ✅" \
+    "ja" "🔉 🔄\n🔊 ✅" \
+    "ko" "🔉 🔄\n🔊 ✅"
 
 
 # 调试相关

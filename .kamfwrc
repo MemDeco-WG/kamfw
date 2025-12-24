@@ -15,6 +15,9 @@ export HOME=${MODDIR}
 export KAMFW_DIR=${MODDIR}/lib/kamfw
 export KAM_MODULES=${KAM_MODULES:-""}
 
+# 日志配置 - 设置 MagicNet 专用日志文件
+export KAM_LOGFILE=${MODDIR}/magicnet.log
+
 # Load persisted language override (if present).
 # This file is written by the `select_language` helper (created below).
 # When present it will export `KAM_LANG` so the i18n system picks it up.
