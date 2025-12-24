@@ -133,7 +133,6 @@ mihomo_start() {
     else
         mihomo_tun
         mihomo
-        sleep 3
         is_mihomo_running || return 1
         return 0
     fi
@@ -142,7 +141,6 @@ mihomo_start() {
 mihomo_stop() {
     if is_mihomo_running; then
         kill $(pgrep -f "mihomo")
-        sleep 10
         is_mihomo_running || return 0
         return 1
     else

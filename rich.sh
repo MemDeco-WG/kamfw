@@ -159,44 +159,6 @@ ask() {
 
     }
 
-# binary_choice - Two-option selection using volume keys
-# Usage: binary_choice "QUESTION_KEY" "OPTION1_KEY" "OPTION2_KEY" [default]
-# Up key selects option1, down key selects option2
-# Returns: 0 for option1, 1 for option2
-binary_choice() {
-    _question="${1:-QUESTION}"
-    _opt1_key="${2:-YES}"
-    _opt2_key="${3:-NO}"
-    _default="${4:-0}"
-    
-    # sanitize default
-    case "$_default" in
-        ''|*[!0-9]*|0) _default=0 ;;
-        *) _default=1 ;;
-    esac
-    
-    _opt1_text=$(i18n "$_opt1_key")
-    _opt2_text=$(i18n "$_opt2_key")
-    
-    print "$_question"
-    if [ "$_default" -eq 0 ]; then
-        printf '%b\n' "${COL_CYN}-> ${_opt1_text}${COL_RST}"
-        printf '%b\n' "   ${_opt2_text}"
-    else
-        printf '%b\n' "   ${_opt1_text}"
-        printf '%b\n' "${COL_CYN}-> ${_opt2_text}${COL_RST}"
-    fi
-    
-    _k=$(wait_key_up_down)
-    case "$_k" in
-        up) _result=0 ;;
-        down) _result=1 ;;
-        *) _result=$_default ;;
-    esac
-    
-    unset _question _opt1_key _opt2_key _default _opt1_text _opt2_text
-    return $_result
-}
 
 # confirm - Simple confirmation dialog with customizable default
 # Usage: confirm "QUESTION_KEY" [default] && do_something
@@ -214,3 +176,4 @@ confirm() {
         return 1
     fi
 }
+
