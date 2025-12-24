@@ -131,7 +131,7 @@ log() {
     # helper to write one line (strip ANSI colors, prefix timestamp)
     _write_line() {
         _line="$1"
-        _clean=$(printf '%s' "$_line" | sed 's/\x1b\[[0-9;]*m//g')
+        _clean=$(printf '%s' "$_line" | tr -d '\033' | sed 's/\[[0-9;]*m//g')
         _maybe_rotate
         printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >> "$_logfile"
     }

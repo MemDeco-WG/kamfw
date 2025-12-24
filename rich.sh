@@ -53,6 +53,11 @@ ask() {
     question="$1"
     shift || true
 
+    # i18n for question text if it's a key
+    if printf '%s' "$question" | grep -q '^[[:alpha:]_][[:alnum:]_]*$'; then
+        question=$(i18n "$question")
+    fi
+
     _opt_count=0
     default_selected=0
 

@@ -82,7 +82,7 @@ set_lang() {
 
 # Remove language override (public)
 unset_lang() {
-    set_kam_language auto
+    set_lang auto
 }
 
 # Interactive language menu (uses ask); exported as `select_language`
@@ -111,10 +111,10 @@ select_lang() {
 
     # ask usage: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
     ask "SWITCH_LANGUAGE" \
-        "LANG_AUTO" 'set_kam_language auto' \
-        "LANG_EN"  'set_kam_language en' \
-        "LANG_ZH"  'set_kam_language zh' \
-        "LANG_JA"  'set_kam_language ja' \
-        "LANG_KO"  'set_kam_language ko' \
+        "LANG_AUTO" 'set_lang auto' \
+        "LANG_EN"  'set_lang en' \
+        "LANG_ZH"  'set_lang zh' \
+        "LANG_JA"  'set_lang ja' \
+        "LANG_KO"  'set_lang ko' \
         "$_default"
 }
