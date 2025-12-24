@@ -23,23 +23,7 @@ wait_boot() {
 
 wait_boot_if_magisk() {
     if is_magisk; then
-        wait_boot
-    else
-        # 对于非 Magisk 环境（如 KSU），仍然需要等待开机完成
-        # 但这里只做简单检查，避免与后续 wait_unlock 重复
-        _wbim_count=0
-        _wbim_timeout=60  # 1分钟超时
-        
-        while [ $_wbim_count -lt $_wbim_timeout ] && [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
-            sleep 1
-            _wbim_count=$((_wbim_count + 1))
-        done
-        
-        if [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; then
-            log "WARN: Boot completion timeout in wait_boot_if_magisk after ${_wbim_timeout}s"
-        fi
-        
-        unset _wbim_count _wbim_timeout
+        wait_boot "$@"
     fi
 }
 
