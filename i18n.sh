@@ -173,9 +173,48 @@ set_i18n "LANG_KO"         "zh" "한국어"     "en" "한국어"           "ja" 
 set_i18n "LANG_SAVE"       "zh" "语言已保存"  "en" "Language saved"   "ja" "言語が保存されました" "ko" "언어가 저장되었습니다"
 set_i18n "LANG_SAVE_ERROR" "zh" "保存失败"    "en" "Operation failed" "ja" "操作に失敗しました"   "ko" "작업 실패"
 
+# 文件更新确认
+set_i18n "FORCE_UPDATE_FILE" \
+    "zh" "强制更新 {} 嘛？" \
+    "en" "Force update {}?" \
+    "ja" "{} を強制更新しますか？" \
+    "ko" "{} 를 강제 업데이트하시겠습니까?"
 
+# 模板替换函数 - 支持管道符传递模板
+# 用法1: echo "模板 {} 文本" | t "参数1" "参数2"
+# 用法2: t "模板 {} 文本" "参数1" "参数2"
+t() {
+    _template=""
+    
+    # 检查是否有管道输入
+    if [ ! -t 0 ]; then
+        _template=$(cat)
+    fi
+    
+    # 如果第一个参数是模板（没有管道输入或管道为空）
+    if [ -z "$_template" ] && [ $# -gt 0 ]; then
+        _template="$1"
+        shift
+    fi
+    
+    [ -z "$_template" ] && return 1
+    
+    _result="$_template"
+    _arg_index=1
+    
+    # 依次替换每个占位符
+    for _arg in "$@"; do
+        # 使用sed替换第_arg_index个出现的{}
+        _result=$(printf '%s' "$_result" | sed "s/{}/$(printf '%s' "$_arg" | sed 's/[\/&]/\\&/g')/")
+        _arg_index=$((_arg_index + 1))
+    done
+    
+    printf '%s' "$_result"
+    
+    unset _template _result _arg_index _arg
+}
 
 # Example usage in scripts (e.g. customize.sh):
 # print "$(i18n "USAGE_GUIDE")"
 # tprint "$(i18n "TERM_INSTALL_MSG")"
-# gprint "$(i18n "GUI_INSTALL_MSG")"
+# gprint "$(i18n "GUI_INSTALL_MSG\")"
