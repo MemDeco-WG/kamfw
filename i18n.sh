@@ -55,7 +55,7 @@ load_i18n() {
 
     # 逐行读取
     # 支持首行为表头：KEY|lang1|lang2|...
-    # 若文件没有表头（旧格式），为了向后兼容，将使用默认顺序 zh en ja ko
+    # 若文件没有表头将使用默认顺序 zh en ja ko
     _lic_langs=""
     while IFS= read -r _lic_line || [ -n "$_lic_line" ]; do
         # 跳过注释行或空行（以 # 开头）
