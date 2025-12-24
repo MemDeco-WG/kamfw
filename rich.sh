@@ -28,7 +28,7 @@ newline () {
     esac
 
     while [ "$_n" -gt 0 ]; do
-        print '\n'
+        printf '\n'
         _n=$((_n - 1))
     done
 }
@@ -37,8 +37,8 @@ newline () {
 guide() {
     _title="${1:-}"
     _content="${2:-}"
-    print '%b\n' "${COL_YLW}${_title}${COL_RST}"
-    print '%b\n' "${COL_YLW}${_content}${COL_RST}"
+    printf '%b\n' "${COL_YLW}${_title}${COL_RST}"
+    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
 }
 
 # ask - Interactive menu with volume key support
@@ -82,7 +82,7 @@ ask() {
 
     # nothing to choose -> just show question
     if [ "$_opt_count" -eq 0 ]; then
-        print "$question"
+        printf '%s\n' "$question"
         return
     fi
 
@@ -100,7 +100,7 @@ ask() {
     _sel="$default_selected"
 
     # initial render
-    print "$question"
+    printf '%s\n' "$question"
     _i=0
     while [ "$_i" -lt "$_opt_count" ]; do
         eval "_txt=\$opt_text_${_i}"
@@ -141,7 +141,7 @@ ask() {
             up)
                 eval "_txt=\$opt_text_${_sel}"
                 eval "_cmd=\$opt_cmd_${_sel}"
-                print "$(i18n 'CONFIRM'): ${_txt}"
+                printf '%s\n' "$(i18n 'CONFIRM'): ${_txt}"
                 eval "$_cmd"
                 break
                 ;;

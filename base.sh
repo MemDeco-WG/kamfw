@@ -23,51 +23,51 @@ else
 fi
 
 info () {
-    print "${COL_GRN}$1${COL_RST}"
+    printf '%b\n' "${COL_GRN}$1${COL_RST}"
     # also write to module log (colors are stripped by log())
     log "INFO: $1"
 }
 
 green () {
-    print "${COL_GRN}$1${COL_RST}"
+    printf '%b\n' "${COL_GRN}$1${COL_RST}"
 }
 
 error () {
-    print "${COL_RED}$1${COL_RST}"
+    printf '%b\n' "${COL_RED}$1${COL_RST}"
     # also write to module log
     log "ERROR: $1"
 }
 
 red() {
-    print "${COL_RED}$1${COL_RST}"
+    printf '%b\n' "${COL_RED}$1${COL_RST}"
 }
 
 warn () {
-    print "${COL_YLW}$1${COL_RST}"
+    printf '%b\n' "${COL_YLW}$1${COL_RST}"
     # also write to module log
     log "WARN: $1"
 }
 
 yellow() {
-    print "${COL_YLW}$1${COL_RST}"
+    printf '%b\n' "${COL_YLW}$1${COL_RST}"
 }
 
 success () {
-    print "${COL_GRN}$1${COL_RST}"
+    printf '%b\n' "${COL_GRN}$1${COL_RST}"
     # also write to module log
     log "SUCCESS: $1"
 }
 
 debug() {
     if [ "${KAM_DEBUG:-0}" = "1" ]; then
-        print "${COL_CYN}[DEBUG] $1${COL_RST}"
+        printf '%b\n' "${COL_CYN}[DEBUG] $1${COL_RST}"
         # only log debug messages when debug is enabled
         log "[DEBUG] $1"
     fi
 }
 
 cyan() {
-    print "${COL_CYN}$1${COL_RST}"
+    printf '%b\n' "${COL_CYN}$1${COL_RST}"
 }
 
 
