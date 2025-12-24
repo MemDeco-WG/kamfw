@@ -4,17 +4,17 @@
 # divider "#" 10
 # divider "=" 20
 divider() {
-    _divider_char="${1:-=}"
-    _divider_width="${2:-80}"
-    _divider_terminal_width=$(stty size 2>/dev/null | cut -d' ' -f2 2>/dev/null)
-    _divider_str=""
-    i=0
-    while [ "$i" -lt "$_divider_width" ]; do
-        _divider_str="${_divider_str}${_divider_char}"
-        i=$((i + 1))
-    done
-    print "${COL_CYN}${_divider_str}${COL_RST}"
-}
+     _divider_char="${1:-▚}"
+     # 优先获取终端宽度：tput > stty > COLUMNS > 兜底80
+     _divider_terminal_width="$(tput cols 2>/dev/null || stty size 2>/dev/null | awk '{print $2}' || echo "${COLUMNS:-80}")"
+     # 校验宽度为有效正整数
+     case "${_divider_terminal_width}" in
+         ''|*[!0-9]*|0) _divider_terminal_width=80 ;;
+     esac
+     _divider_width="${2:-${_divider_terminal_width}}"
+     # 无循环填充：生成指定宽度空白串，替换为分隔符
+     printf "%b" "${COL_CYN}$(printf "%${_divider_width}s" "" | tr ' ' "${_divider_char}")${COL_RST}\n"
+ }
 
 newline () {
     # Print N blank lines (default: 1)
@@ -28,46 +28,36 @@ newline () {
     esac
 
     while [ "$_n" -gt 0 ]; do
-        print ""
+        printf '\n'
         _n=$((_n - 1))
     done
 }
 
-# 操作指南函数
-guide() {
-    # Usage:
-    # guide "GUIDE_TITLE" "GUIDE_CONTENT"
-    # Print a guide with a title and content
-
-    title="$1"
-    content="$2"
-    newline
-    print "${COL_CYN}${title}${COL_RST}"
-    print "${COL_CYN}${content}${COL_RST}"
-    divider "^"
+# print (with optional newline)
+print() {
+    _text="${1:-}"
+    printf '%b\n' "$_text"
 }
 
-ask() {
-    # Usage:
-    # ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
-    # Backwards-compatible with older call: ask "QUESTION" "opt1_text" "opt2_text" "opt1_cmd" "opt2_cmd" [default_index]
-    # Supports arbitrary number of options. Controls:
-    # - Volume Down: cycle to next option (wraps around)
-    # - Volume Up: confirm current selection and execute its command
+# guide (with optional newline)
+guide() {
+    _title="${1:-}"
+    _content="${2:-}"
+    printf '%b\n' "${COL_YLW}${_title}${COL_RST}"
+    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
+}
 
+# ask - Interactive menu with volume key support
+# Usage: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
+ask() {
     question="$1"
     shift || true
-
-    # 检查是否为 i18n 键值（不包含空格或特殊字符）
-    if printf '%s' "$question" | grep -q '^[[:alpha:]_][[:alnum:]_]*$'; then
-        question=$(i18n "$question")
-    fi
 
     _opt_count=0
     default_selected=0
 
-    # New-style: parse text/cmd pairs, optional trailing default index
-    while [ "$#" -gt 0 ]; do
+    # parse arguments: pairs of (text, command) + optional trailing default index
+    while [ $# -gt 0 ]; do
             _txt="$1"
             shift || true
 
@@ -125,67 +115,97 @@ ask() {
 
     newline
 
-    # If getevent isn't available (e.g., running in a plain terminal), fall back to typed input.
-    # Otherwise use volume keys: volume-down cycles (wrap), volume-up confirms.
-    if ! command -v getevent >/dev/null 2>&1; then
-        printf '> '
-        if ! read -r sel; then
-            sel="$default_selected"
-        fi
-        [ -z "$sel" ] && sel="$default_selected"
+    # interactive loop: volume-down cycles, volume-up confirms
+    while :; do
+        _k=$(wait_key_up_down)
+        case "$_k" in
+            down)
+                _sel=$(( (_sel + 1) % _opt_count ))
+                # move cursor up only for options + trailing blank line (not the question)
+                printf "${ANSI_CURSOR_UP}" "$((_opt_count + 1))"
 
-        case "$sel" in
-            *[!0-9]*) sel="$default_selected" ;;
+                _i=0
+                while [ "$_i" -lt "$_opt_count" ]; do
+                    eval "_txt=\$opt_text_${_i}"
+                    # clear entire line and redraw
+                    printf "\r${ANSI_CLEAR_LINE}"
+                    if [ "$_i" -eq "$_sel" ]; then
+                        printf '%b\n' "${COL_CYN}-> ${_i}) ${_txt}${COL_RST}"
+                    else
+                        printf '%b\n' "   ${_i}) ${_txt}"
+                    fi
+                    _i=$((_i + 1))
+                done
+                # clear trailing blank line and emit a fresh one
+                printf "\r${ANSI_CLEAR_LINE}\n"
+                ;;
+            up)
+                eval "_txt=\$opt_text_${_sel}"
+                eval "_cmd=\$opt_cmd_${_sel}"
+                print "$(i18n 'CONFIRM'): ${_txt}"
+                eval "$_cmd"
+                break
+                ;;
         esac
+    done
+        newline
 
-        # ensure within range (numeric check via test redirects errors)
-        if [ "$sel" -ge 0 ] 2>/dev/null && [ "$sel" -lt "$_opt_count" ] 2>/dev/null; then
-            eval "_txt=\$opt_text_${sel}"
-            eval "_cmd=\$opt_cmd_${sel}"
-        else
-            sel="$default_selected"
-            eval "_txt=\$opt_text_${sel}"
-            eval "_cmd=\$opt_cmd_${sel}"
-        fi
+        return
 
-        print "$(i18n 'CONFIRM'): ${_txt}"
-        eval "$_cmd"
+    }
+
+# binary_choice - Two-option selection using volume keys
+# Usage: binary_choice "QUESTION_KEY" "OPTION1_KEY" "OPTION2_KEY" [default]
+# Up key selects option1, down key selects option2
+# Returns: 0 for option1, 1 for option2
+binary_choice() {
+    _question="${1:-QUESTION}"
+    _opt1_key="${2:-YES}"
+    _opt2_key="${3:-NO}"
+    _default="${4:-0}"
+    
+    # sanitize default
+    case "$_default" in
+        ''|*[!0-9]*|0) _default=0 ;;
+        *) _default=1 ;;
+    esac
+    
+    _opt1_text=$(i18n "$_opt1_key")
+    _opt2_text=$(i18n "$_opt2_key")
+    
+    print "$_question"
+    if [ "$_default" -eq 0 ]; then
+        printf '%b\n' "${COL_CYN}-> ${_opt1_text}${COL_RST}"
+        printf '%b\n' "   ${_opt2_text}"
     else
-        # interactive loop: volume-down cycles, volume-up confirms
-        while :; do
-            _k=$(wait_key_up_down)
-            case "$_k" in
-                down)
-                    _sel=$(( (_sel + 1) % _opt_count ))
-                    # move cursor up (options + trailing blank line) lines to redraw
-                    printf '\033[%dA' "$((_opt_count + 1))"
-
-                    _i=0
-                    while [ "$_i" -lt "$_opt_count" ]; do
-                        eval "_txt=\$opt_text_${_i}"
-                        # clear entire line
-                        printf '\033[2K\r'
-                        if [ "$_i" -eq "$_sel" ]; then
-                            printf '%b\n' "${COL_CYN}-> ${_i}) ${_txt}${COL_RST}"
-                        else
-                            printf '%b\n' "   ${_i}) ${_txt}"
-                        fi
-                        _i=$((_i + 1))
-                    done
-                    # clear trailing blank line and emit a fresh one
-                    printf '\033[2K\r\n'
-                    ;;
-                up)
-                    eval "_txt=\$opt_text_${_sel}"
-                    eval "_cmd=\$opt_cmd_${_sel}"
-                    print "$(i18n 'CONFIRM'): ${_txt}"
-                    eval "$_cmd"
-                    break
-                    ;;
-            esac
-        done
+        printf '%b\n' "   ${_opt1_text}"
+        printf '%b\n' "${COL_CYN}-> ${_opt2_text}${COL_RST}"
     fi
+    
+    _k=$(wait_key_up_down)
+    case "$_k" in
+        up) _result=0 ;;
+        down) _result=1 ;;
+        *) _result=$_default ;;
+    esac
+    
+    unset _question _opt1_key _opt2_key _default _opt1_text _opt2_text
+    return $_result
+}
 
-    newline
-    return
+# confirm - Simple confirmation dialog with customizable default
+# Usage: confirm "QUESTION_KEY" [default] && do_something
+# default: 0 for yes, 1 for no (default: 1)
+# Returns: 0 if yes, 1 if no
+confirm() {
+    _question="${1:-CONFIRM_ACTION}"
+    _default="${2:-1}"
+    
+    if binary_choice "$_question" "YES" "NO" "$_default"; then
+        unset _question _default
+        return 0
+    else
+        unset _question _default
+        return 1
+    fi
 }

@@ -7,10 +7,6 @@
 import rich
 import self
 
-export MIHOMO_DIR="$MODDIR/mihomo"
-export MIHOMO_CFG="$MIHOMO_DIR/config.yaml"
-
-
 # Get the current document.location URL from the webroot index.
 # Usage: mihomo_get_ui_redirect [index_file]
 # Prints the URL on stdout and returns 0 on success.
@@ -136,8 +132,8 @@ mihomo_start() {
         return 1
     else
         mihomo_tun
-        mihomo -d "${MIHOMO_DIR}" -f "${MIHOMO_CFG}" 2>&1 | log -f $MIHOMO_LOG -r 1M &
-        sleep 10
+        mihomo
+        sleep 3
         is_mihomo_running || return 1
         return 0
     fi

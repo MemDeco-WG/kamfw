@@ -21,21 +21,27 @@ export KAM_MODULES=${KAM_MODULES:-""}
 if [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
     . "${KAMFW_DIR}/.kamfw_lang"
 fi
+# =============================================================================
+# 实验区域
+# =============================================================================
+
+
 
 # =============================================================================
 # 基础函数
 # =============================================================================
 # ui_print plus
 print() {
-    _print_msg="$1"
-    printf '%b\n' "$_print_msg"
-
-    if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
-        _print_clean_msg=$(printf '%b' "$_print_msg" | sed 's/\x1b\[[0-9;]*m//g')
-        printf 'ui_print %s\n' "$_print_clean_msg" >&"$OUTFD"
-        printf 'ui_print \n' >&"$OUTFD"
-    fi
+     _print_msg="$1"
+     if $BOOTMODE; then
+         printf '%b\n' "$_print_msg"
+     else
+         if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
+             printf 'ui_print %s\nui_print\n' "$_print_msg" >&"$OUTFD"
+         fi
+     fi
 }
+
 
 # =============================================================================
 # 内部API

@@ -91,6 +91,13 @@ select_lang() {
     import i18n || true
     import rich  || true
 
+    # Ensure i18n system is properly initialized by forcing a call
+    _test_i18n=$(i18n "SWITCH_LANGUAGE" 2>/dev/null)
+    [ -z "$_test_i18n" ] && {
+        # Fallback to English if i18n is not working
+        export KAM_LANG="en"
+    }
+
     # Determine default selection based on current language
     _cur="$(_lang_current)"
     _default=0

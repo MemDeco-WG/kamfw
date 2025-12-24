@@ -1,12 +1,27 @@
 # shellcheck shell=ash
-#
-export COL_RED='\033[0;31m'
-export COL_GRN='\033[0;32m'
-export COL_YLW='\033[0;33m'
-export COL_BLU='\033[0;34m'
-export COL_PUR='\033[0;35m'
-export COL_CYN='\033[0;36m'
-export COL_RST='\033[0m'
+
+if [ -t 0 ]; then
+    export COL_RED='\033[0;31m'
+    export COL_GRN='\033[0;32m'
+    export COL_YLW='\033[0;33m'
+    export COL_BLU='\033[0;34m'
+    export COL_PUR='\033[0;35m'
+    export COL_CYN='\033[0;36m'
+    export COL_RST='\033[0m'
+    export ANSI_CURSOR_UP='\033[%dA'
+    export ANSI_CLEAR_LINE='\033[2K\r'
+else
+    export COL_RED='╳'
+    export COL_GRN='▚'
+    export COL_YLW='◬'
+    export COL_BLU='◈'
+    export COL_PUR='║'
+    export COL_CYN='┆'
+    export COL_RST='❖'
+    export ANSI_CURSOR_UP=''
+    export ANSI_CLEAR_LINE=''
+fi
+
 
 info () {
     print "${COL_GRN}$1${COL_RST}"

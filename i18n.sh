@@ -111,10 +111,10 @@ set_i18n "FAILED"    "zh" "失败" "en" "Failed" "ja" "失敗" "ko" "실패"
 # ask/choose guidance (used by `ask` via `guide`)
 set_i18n "ASK_GUIDE_TITLE" "zh" "操作提示" "en" "How to use" "ja" "使い方" "ko" "사용 방법"
 set_i18n "ASK_GUIDE_CONTENT" \
-    "zh" "音量键：音量减切换选项（循环），音量加确认并执行。" \
-    "en" "Volume keys: Volume Down cycles options (wraps around); Volume Up confirms and executes." \
-    "ja" "音量キー：ボリュームダウンで選択肢を切替（ループします）、音量アップで選択を確定して実行します。" \
-    "ko" "볼륨 키: 볼륨 작게로 항목 전환(반복), 볼륨 크게로 선택 확인 및 실행합니다."
+    "zh" "🔉 音量减：切换选项（循环）\n🔊 音量加：确认并执行" \
+    "en" "🔉 Volume Down: Cycle options (wraps around)\n🔊 Volume Up: Confirm and execute" \
+    "ja" "🔉 ボリュームダウン：選択肢を切替（ループ）\n🔊 ボリュームアップ：選択を確定して実行" \
+    "ko" "🔉 볼륨 작게：항목 전환(반복)\n🔊 볼륨 크게：선택 확인 및 실행"
 
 
 # 调试相关
@@ -129,9 +129,19 @@ set_i18n "FEED_STAR" "zh" "投喂星光" "en" "Feed star" "ja" "星を餌付け"
 # i18n labels (shell UI)
 set_i18n "SWITCH_LANGUAGE" "zh" "切换语言"    "en" "Switch Language"  "ja" "言語切替"           "ko" "언어 전환"
 set_i18n "LANG_AUTO"       "zh" "自动(系统)"  "en" "Auto (system)"    "ja" "自動(システム)"      "ko" "자동(시스템)"
-set_i18n "LANG_EN"         "zh" "英文"       "en" "English"          "ja" "英語"               "ko" "영어"
-set_i18n "LANG_ZH"         "zh" "中文"       "en" "Chinese"          "ja" "中国語"             "ko" "중국어"
-set_i18n "LANG_JA"         "zh" "日语"       "en" "Japanese"         "ja" "日本語"             "ko" "일본어"
-set_i18n "LANG_KO"         "zh" "韩语"       "en" "Korean"           "ja" "韓国語"             "ko" "한국어"
+set_i18n "LANG_EN"         "zh" "English"    "en" "English"          "ja" "English"           "ko" "English"
+set_i18n "LANG_ZH"         "zh" "中文"       "en" "中文"             "ja" "中文"               "ko" "中文"
+set_i18n "LANG_JA"         "zh" "日本語"     "en" "日本語"           "ja" "日本語"             "ko" "日本語"
+set_i18n "LANG_KO"         "zh" "한국어"     "en" "한국어"           "ja" "한국어"             "ko" "한국어"
 set_i18n "LANG_SAVE"       "zh" "语言已保存"  "en" "Language saved"   "ja" "言語が保存されました" "ko" "언어가 저장되었습니다"
 set_i18n "LANG_SAVE_ERROR" "zh" "保存失败"    "en" "Operation failed" "ja" "操作に失敗しました"   "ko" "작업 실패"
+
+# Initialize i18n system - ensure all i18n variables are set
+init_i18n() {
+    # Force initialization by testing a key
+    _test=$(i18n "SWITCH_LANGUAGE" 2>/dev/null)
+    return 0
+}
+
+# Auto-initialize when i18n.sh is sourced
+init_i18n
