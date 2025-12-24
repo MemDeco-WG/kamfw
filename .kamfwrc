@@ -45,6 +45,20 @@ print() {
      fi
 }
 
+// terminal print (tty)
+tprint() {
+    [ -t 1 ] || return 0
+    print "$@"
+}
+
+// GUI print (not tty)
+gprint() {
+    [ -t 1 ] && return 0
+    printf "$@"
+}
+
+
+
 
 # =============================================================================
 # 内部API

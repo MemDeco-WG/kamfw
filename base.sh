@@ -22,7 +22,6 @@ else
     export ANSI_CLEAR_LINE=''
 fi
 
-
 info () {
     print "${COL_GRN}$1${COL_RST}"
     # also write to module log (colors are stripped by log())

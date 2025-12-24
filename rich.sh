@@ -28,23 +28,17 @@ newline () {
     esac
 
     while [ "$_n" -gt 0 ]; do
-        printf '\n'
+        print '\n'
         _n=$((_n - 1))
     done
 }
 
-# print (with optional newline)
-print() {
-    _text="${1:-}"
-    printf '%b\n' "$_text"
-}
-
-# guide (with optional newline)
+# guide
 guide() {
     _title="${1:-}"
     _content="${2:-}"
-    printf '%b\n' "${COL_YLW}${_title}${COL_RST}"
-    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
+    print '%b\n' "${COL_YLW}${_title}${COL_RST}"
+    print '%b\n' "${COL_YLW}${_content}${COL_RST}"
 }
 
 # ask - Interactive menu with volume key support
@@ -167,7 +161,7 @@ ask() {
 confirm() {
     _question="${1:-CONFIRM_ACTION}"
     _default="${2:-1}"
-    
+
     if binary_choice "$_question" "YES" "NO" "$_default"; then
         unset _question _default
         return 0
@@ -176,4 +170,3 @@ confirm() {
         return 1
     fi
 }
-

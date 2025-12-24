@@ -54,45 +54,82 @@ load_i18n() {
     [ -f "$_lic_file" ] || return 1
 
     # 逐行读取
-    # IFS='|' 指定分隔符
-    while IFS='|' read -r _lic_key _lic_zh _lic_en _lic_ja _lic_ko || [ -n "$_lic_key" ]; do
-        # 1. 跳过注释行（以 # 开头）
-        case "$_lic_key" in
+    # 支持首行为表头：KEY|lang1|lang2|...
+    # 若文件没有表头（旧格式），为了向后兼容，将使用默认顺序 zh en ja ko
+    _lic_langs=""
+    while IFS= read -r _lic_line || [ -n "$_lic_line" ]; do
+        # 跳过注释行或空行（以 # 开头）
+        case "$_lic_line" in
             \#*|"") continue ;;
         esac
 
-        # 2. 调用你已有的 set_i18n 函数
-        # 注意：这里假设你的 set_i18n 接受这几种固定语言
-        set_i18n "$_lic_key" \
-            "zh" "$_lic_zh" \
-            "en" "$_lic_en" \
-            "ja" "$_lic_ja" \
-            "ko" "$_lic_ko"
+        # 如果首个非注释行是表头（以 KEY| 开头），则解析语言列
+        if [ -z "$_lic_langs" ]; then
+            case "$_lic_line" in
+                KEY\|*)
+                    _lic_hdr="${_lic_line#KEY|}"
+                    _lic_langs=$(printf '%s' "$_lic_hdr" | tr '|' ' ')
+                    continue
+                    ;;
+            esac
+            # 未找到表头 -> 兼容旧格式
+            _lic_langs="zh en ja ko"
+            # 继续处理当前行为数据行
+        fi
+
+        # 提取 key（第一个字段）
+        _lic_key=$(printf '%s' "$_lic_line" | cut -d'|' -f1)
+        case "$_lic_key" in
+            ''|\#*) continue ;;
+        esac
+
+        # 按语言顺序取对应字段并调用 set_i18n（对兼容性采用每对字段单独调用）
+        _field_idx=2
+        for _lic_lang in $_lic_langs; do
+            _lic_val=$(printf '%s' "$_lic_line" | cut -d'|' -f"$_field_idx")
+            set_i18n "$_lic_key" "$_lic_lang" "$_lic_val"
+            _field_idx=$((_field_idx + 1))
+        done
 
     done < "$_lic_file"
 
     # 清理变量
-    unset _lic_file _lic_key _lic_zh _lic_en _lic_ja _lic_ko
+    unset _lic_file _lic_line _lic_hdr _lic_langs _lic_key _lic_val _field_idx _lic_lang
 }
 
 dump_i18n() {
     _dic_file="$1"
     [ -n "$_dic_file" ] || return 1
-    printf 'KEY|zh|en|ja|ko\n' > "$_dic_file"
 
-    _dic_keys=$(set | grep '^_I18N_' | cut -d'_' -f3 | sort -u)
+    # 自动收集当前已注册的语言（取变量名最后一段作为语言标识）
+    _dic_langs=$(set | grep '^_I18N_' | sed -n 's/^_I18N_.*_\([^=]*\)=.*/\1/p' | sort -u)
+
+    # 若未找到任何语言（极少情况），输出一个兼容的默认表头
+    if [ -z "$_dic_langs" ]; then
+        _dic_langs="zh en ja ko"
+    fi
+
+    # 打印表头
+    _hdr="KEY"
+    for _lang in $_dic_langs; do
+        _hdr="${_hdr}|${_lang}"
+    done
+    printf '%s\n' "$_hdr" > "$_dic_file"
+
+    # 收集所有 keys（变量名中 _I18N_ 与最后一个 '_' 之间的部分）
+    _dic_keys=$(set | grep '^_I18N_' | sed -n 's/^_I18N_\(.*\)_\([^=]*\)=.*/\1/p' | sort -u)
 
     for _dic_k in $_dic_keys; do
-        eval "_dic_zh=\"\${_I18N_${_dic_k}_zh:-}\""
-        eval "_dic_en=\"\${_I18N_${_dic_k}_en:-}\""
-        eval "_dic_ja=\"\${_I18N_${_dic_k}_ja:-}\""
-        eval "_dic_ko=\"\${_I18N_${_dic_k}_ko:-}\""
-
-        printf '%s|%s|%s|%s|%s\n' \
-            "$_dic_k" "$_dic_zh" "$_dic_en" "$_dic_ja" "$_dic_ko" >> "$_dic_file"
+        _out="${_dic_k}"
+        for _lang in $_dic_langs; do
+            _var="_I18N_${_dic_k}_${_lang}"
+            eval "_val=\"\${${_var}:-}\""
+            _out="${_out}|${_val}"
+        done
+        printf '%s\n' "$_out" >> "$_dic_file"
     done
 
-    unset _dic_file _dic_keys _dic_k _dic_zh _dic_en _dic_ja _dic_ko
+    unset _dic_file _dic_langs _hdr _dic_keys _dic_k _lang _var _val _out
     success "I18N data dumped to: $_dic_file"
 }
 
@@ -123,7 +160,7 @@ set_i18n "DEBUG_ON"     "zh" "调试模式已开启" "en" "Debug mode enabled" "
 set_i18n "DEBUG_OFF"    "zh" "调试模式已关闭" "en" "Debug mode disabled" "ja" "デバッグモードが無効になりました" "ko" "디버그 모드가 비활성화되었습니다"
 set_i18n "DEBUG_STATUS" "zh" "调试模式状态" "en" "Debug status" "ja" "デバッグステータス" "ko" "디버그 상태"
 
-# 社交/支持
+# 支持
 set_i18n "FEED_STAR" "zh" "投喂星光" "en" "Feed star" "ja" "星を餌付け" "ko" "별에게 먹이를 주세요"
 
 # i18n labels (shell UI)
@@ -136,12 +173,9 @@ set_i18n "LANG_KO"         "zh" "한국어"     "en" "한국어"           "ja" 
 set_i18n "LANG_SAVE"       "zh" "语言已保存"  "en" "Language saved"   "ja" "言語が保存されました" "ko" "언어가 저장되었습니다"
 set_i18n "LANG_SAVE_ERROR" "zh" "保存失败"    "en" "Operation failed" "ja" "操作に失敗しました"   "ko" "작업 실패"
 
-# Initialize i18n system - ensure all i18n variables are set
-init_i18n() {
-    # Force initialization by testing a key
-    _test=$(i18n "SWITCH_LANGUAGE" 2>/dev/null)
-    return 0
-}
 
-# Auto-initialize when i18n.sh is sourced
-init_i18n
+
+# Example usage in scripts (e.g. customize.sh):
+# print "$(i18n "USAGE_GUIDE")"
+# tprint "$(i18n "TERM_INSTALL_MSG")"
+# gprint "$(i18n "GUI_INSTALL_MSG")"
