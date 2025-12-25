@@ -33,43 +33,6 @@ print() {
 }
 
 # =============================================================================
-# 内部API
-# =============================================================================
-
-_kamfw_load () {
-    _kamfw_load_name=$1
-
-    _kamfw_load_path=${KAMFW_DIR}/$1.sh
-    case " ${KAM_MODULES} " in
-        *" ${_kamfw_load_name} "*)
-            return 0
-            ;;
-    esac
-
-    if [ -f "$_kamfw_load_path" ]; then
-        source "$_kamfw_load_path"
-    else
-        print "Error: Module '$1' not found"
-    fi
-}
-
-_kamfw_list () {
-    print "Available modules:"
-    for module in ${KAM_MODULES}; do
-        print "  $module"
-    done
-}
-
-_kamfw_help () {
-    print "Usage: kamfw <command>"
-    print "Commands:"
-    print "  load <module>"
-    print "  unload <module>"
-    print "  list"
-    print "  help"
-}
-
-# =============================================================================
 # 工具加载库
 # =============================================================================
 
@@ -104,13 +67,6 @@ import base
 # base.sh
 # shellcheck shell=ash
 #
-export COL_RED='\033[0;31m'
-export COL_GRN='\033[0;32m'
-export COL_YLW='\033[0;33m'
-export COL_BLU='\033[0;34m'
-export COL_PUR='\033[0;35m'
-export COL_CYN='\033[0;36m'
-export COL_RST='\033[0m'
 
 info () {
     print "${COL_GRN}$1${COL_RST}"

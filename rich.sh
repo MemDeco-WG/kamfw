@@ -1,5 +1,32 @@
 # shellcheck shell=ash
 
+
+# 内部函数：执行文件更新操作
+_do_update_file() {
+    # 复制已安装模块的文件并重命名
+    _installed_file="$_installed_module_path/$_relative_path"
+    _temp_file="$MODPATH/$_relative_path"
+    
+    # 重命名新文件
+    mv "$_temp_file" "$_temp_file.update"
+    # .update表示这个是新模块更新的文件
+    # 为了避免覆盖用户修改的文件，这里重命名为.update
+    # 然后会把已经安装好的模块的相关文件复制到临时文件夹
+    # 这样就实现了安全更新
+    # 如果已安装模块中存在该文件，复制过来
+    if [ -f "$_installed_file" ]; then
+        # 确保目标目录存在
+        _temp_dir="${_temp_file%/*}"
+        [ "$_temp_dir" != "$_temp_file" ] && mkdir -p "$_temp_dir"
+        # 复制文件，保持权限
+        cp -a "$_installed_file" "$_temp_file"
+    fi
+    
+    unset _relative_path _module_id _installed_module_path
+    unset _installed_file _temp_file _temp_dir
+    return 0
+}
+
 # divider
 # divider "#" 10
 # divider "=" 20
@@ -28,7 +55,7 @@ newline () {
     esac
 
     while [ "$_n" -gt 0 ]; do
-        print '\n'
+        printf '\n'
         _n=$((_n - 1))
     done
 }
@@ -37,8 +64,8 @@ newline () {
 guide() {
     _title="${1:-}"
     _content="${2:-}"
-    print '%b\n' "${COL_YLW}${_title}${COL_RST}"
-    print '%b\n' "${COL_YLW}${_content}${COL_RST}"
+    printf '%b\n' "${COL_YLW}${_title}${COL_RST}"
+    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
 }
 
 # ask - Interactive menu with volume key support
@@ -82,7 +109,7 @@ ask() {
 
     # nothing to choose -> just show question
     if [ "$_opt_count" -eq 0 ]; then
-        print "$question"
+        printf '%s\n' "$question"
         return
     fi
 
@@ -100,7 +127,7 @@ ask() {
     _sel="$default_selected"
 
     # initial render
-    print "$question"
+    printf '%s\n' "$question"
     _i=0
     while [ "$_i" -lt "$_opt_count" ]; do
         eval "_txt=\$opt_text_${_i}"
@@ -141,7 +168,7 @@ ask() {
             up)
                 eval "_txt=\$opt_text_${_sel}"
                 eval "_cmd=\$opt_cmd_${_sel}"
-                print "$(i18n 'CONFIRM'): ${_txt}"
+                printf '%s\n' "$(i18n 'CONFIRM'): ${_txt}"
                 eval "$_cmd"
                 break
                 ;;
@@ -162,11 +189,51 @@ confirm() {
     _question="${1:-CONFIRM_ACTION}"
     _default="${2:-1}"
 
-    if binary_choice "$_question" "YES" "NO" "$_default"; then
-        unset _question _default
-        return 0
-    else
-        unset _question _default
-        return 1
-    fi
+    # 使用ask函数实现确认对话框
+    ask "$_question" \
+        "YES" \
+            'return 0' \
+        "NO" \
+            'return 1' \
+        "$_default"
+    
+    unset _question _default
 }
+
+# confirm_update_file - 确认更新文件
+# Usage: confirm_update_file <relative_path>
+# 如果模块已安装，询问是否强制更新文件，默认选择否
+# 选择否时，会复制已安装模块的文件并重命名为.update
+confirm_update_file() {
+    _relative_path="$1"
+    
+    # 检查MODPATH环境变量
+    [ -z "${MODPATH:-}" ] && return 0
+    
+    # 检查参数
+    [ -z "$_relative_path" ] && return 0
+    
+    # 获取模块ID
+    _module_id=""
+    if [ -f "$MODPATH/module.prop" ]; then
+        _module_id=$(sed -n 's/^id=//p' "$MODPATH/module.prop" | head -n1)
+    fi
+    [ -z "$_module_id" ] && return 0
+    
+    # 检查模块是否已安装
+    _installed_module_path="/data/adb/modules/$_module_id"
+    [ ! -d "$_installed_module_path" ] && return 0
+    
+    # 直接使用ask函数，默认选择否(1)
+    # 使用t函数动态构建标题
+    _final_title="$(i18n 'FORCE_UPDATE_FILE' | t "$_relative_path")"
+    ask "$_final_title" \
+        "$(i18n 'YES')" \
+            'unset _relative_path _module_id _installed_module_path; return 0' \
+        "$(i18n 'NO')" \
+            '_do_update_file' \
+        1
+    
+    # 这个函数不会执行到这里，因为ask会处理返回
+}
+
