@@ -4,7 +4,7 @@
 wait_boot() {
     _wb_timeout=120  # 2分钟超时
     _wb_count=0
-    
+
     while [ $_wb_count -lt $_wb_timeout ] && [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
         sleep 1
         _wb_count=$((_wb_count + 1))
@@ -17,7 +17,7 @@ wait_boot() {
 
     # 可选的额外缓冲时间
     [ -n "$1" ] && sleep "$1"
-    
+
     unset _wb_timeout _wb_count
 }
 
@@ -29,16 +29,16 @@ wait_boot_if_magisk() {
         # 但这里只做简单检查，避免与后续 wait_unlock 重复
         _wbim_count=0
         _wbim_timeout=60  # 1分钟超时
-        
+
         while [ $_wbim_count -lt $_wbim_timeout ] && [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; do
             sleep 1
             _wbim_count=$((_wbim_count + 1))
         done
-        
+
         if [ "$(getprop sys.boot_completed 2>/dev/null)" != "1" ]; then
             log "WARN: Boot completion timeout in wait_boot_if_magisk after ${_wbim_timeout}s"
         fi
-        
+
         unset _wbim_count _wbim_timeout
     fi
 }
@@ -48,16 +48,16 @@ wait_boot_if_magisk() {
 wait_unlock() {
     # 必须先确保开机完成
     wait_boot
-    
+
     _wu_timeout=300  # 5分钟超时
     _wu_count=0
-    
+
     # 检测 /sdcard 目录是否可用
     while [ $_wu_count -lt $_wu_timeout ]; do
         if [ -d "/sdcard" ]; then
             break
         fi
-        
+
         sleep 1
         _wu_count=$((_wu_count + 1))
     done
@@ -68,7 +68,7 @@ wait_unlock() {
     fi
 
     [ -n "$1" ] && sleep "$1"
-    
+
     unset _wu_timeout _wu_count
 }
 
@@ -83,7 +83,7 @@ wait_net() {
             unset _wn_timeout _wn_count
             return 0
         fi
-        
+
         _wn_count=$((_wn_count + 1))
         sleep 1
     done

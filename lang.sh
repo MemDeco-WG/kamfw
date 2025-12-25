@@ -19,8 +19,20 @@
 : "${KAMFW_DIR:=${MODDIR:-${0%/*}}/lib/kamfw}"
 : "${KAM_LANG_FILE:=${KAMFW_DIR}/.kamfw_lang}"
 
-# helper: return normalized current language (zh|en|ja|ko)
+# helper: return normalized current language (zh|en|ja|ko|auto)
 _lang_current() {
+    # If a persisted override exists, source it to obtain the explicit override
+    if [ -z "${KAM_LANG:-}" ] && [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
+        # shellcheck disable=SC1090
+        . "${KAMFW_DIR}/.kamfw_lang" 2>/dev/null || true
+    fi
+
+    # If user explicitly selected 'auto', return 'auto' so callers can treat it specially
+    if [ "${KAM_LANG:-}" = "auto" ]; then
+        printf 'auto'
+        return 0
+    fi
+
     _l="${KAM_LANG:-$(getprop persist.sys.locale 2>/dev/null | cut -d'-' -f1)}"
     _l="${_l:-en}"
     case "$_l" in
@@ -98,23 +110,62 @@ select_lang() {
         export KAM_LANG="en"
     }
 
-    # Determine default selection based on current language
+    # Determine current normalized language (may return 'auto')
     _cur="$(_lang_current)"
-    _default=0
-    case "$_cur" in
-        en) _default=1 ;;
-        zh) _default=2 ;;
-        ja) _default=3 ;;
-        ko) _default=4 ;;
-        *)  _default=0 ;;
-    esac
 
-    # ask usage: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
-    ask "SWITCH_LANGUAGE" \
-        "LANG_AUTO" 'set_lang auto' \
-        "LANG_EN"  'set_lang en' \
-        "LANG_ZH"  'set_lang zh' \
-        "LANG_JA"  'set_lang ja' \
-        "LANG_KO"  'set_lang ko' \
-        "$_default"
+    # Discover available language codes from i18n exports (extract language tokens)
+    _dic_langs=$(env | grep '^_I18N_' | sed -n 's/^_I18N_.*_\([^=]*\)=.*/\1/p' | sort -u)
+    if [ -z "$_dic_langs" ]; then
+        # fallback to a sensible default set
+        _dic_langs="en zh ja ko"
+    fi
+
+    _default=0
+    _idx=0
+
+    # Build ask arguments as positional parameters to avoid eval.
+    # ask expects: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
+    set -- "SWITCH_LANGUAGE"
+
+    # Always add the AUTO option first
+    _label_auto=$(i18n "LANG_AUTO")
+    set -- "$@" "${_label_auto}" "set_lang auto"
+    if [ "$_cur" = "auto" ]; then
+        _default=0
+    fi
+    _idx=1
+
+    for _l in $_dic_langs; do
+        # sanitize token and normalize
+        case "$_l" in
+            [A-Za-z0-9._-]*) ;;   # ok
+            *) continue ;;        # skip suspicious tokens
+        esac
+
+        _l_norm=$(printf '%s' "$_l" | tr '[:upper:]' '[:lower:]')
+        _upper=$(printf '%s' "$_l_norm" | tr '[:lower:]' '[:upper:]')
+        _label=$(i18n "LANG_${_upper}")
+
+        set -- "$@" "${_label}" "set_lang ${_l_norm}"
+
+        # pick the default index if it matches current normalized language
+        if [ "$_l_norm" = "$_cur" ]; then
+            _default=$((_idx))
+        fi
+
+        _idx=$((_idx + 1))
+    done
+
+    # Ensure default is within the valid range
+    if [ "$_default" -ge "$_idx" ]; then
+        _default=0
+    fi
+
+    ask "$@" "$_default"
+}
+
+# Backward-compatibility: older modules expect `select_language` to exist
+# Provide a small wrapper to preserve the previous API.
+select_language() {
+    select_lang "$@"
 }

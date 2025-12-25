@@ -344,17 +344,25 @@ depends_on() {
     _do_res=0
 
     case "$_do_type" in
-        manager) _depends_on_manager "$_do_target" "$_do_spec" ;;
-        app)     _depends_on_app "$_do_target" "$_do_spec" ;;
-        module)  _depends_on_module "$_do_target" "$_do_spec" ;;
+        manager)
+            _depends_on_manager "$_do_target" "$_do_spec"
+            _do_res=$?
+            ;;
+        app)
+            _depends_on_app "$_do_target" "$_do_spec"
+            _do_res=$?
+            ;;
+        module)
+            _depends_on_module "$_do_target" "$_do_spec"
+            _do_res=$?
+            ;;
         *)
             error "Unknown dependency type: $_do_type"
             _do_res=1
             ;;
     esac
 
-    # 捕获子函数的返回码
-    _do_res=${_do_res:-$?}
+    # helper return code is already captured in each branch above
 
     unset _do_type _do_target _do_spec
     return "$_do_res"

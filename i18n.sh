@@ -35,11 +35,13 @@ i18n() {
 
     _i1_var_name="_I18N_${_i1_key}_${_i1_lang}"
 
-    eval "_i1_text=\"\${${_i1_var_name}:-}\""
+    # Prefer reading from environment variables (exported by set_i18n) instead of using eval.
+    # This avoids eval's security risks and works in shells where indirect expansion may be missing.
+    _i1_text=$(env | awk -F= -v key="${_i1_var_name}" '$1==key {print substr($0, length($1)+2); exit}')
 
     if [ -z "$_i1_text" ] && [ "$_i1_lang" != "en" ]; then
         _i1_var_name="_I18N_${_i1_key}_en"
-        eval "_i1_text=\"\${${_i1_var_name}:-}\""
+        _i1_text=$(env | awk -F= -v key="${_i1_var_name}" '$1==key {print substr($0, length($1)+2); exit}')
     fi
 
     [ -z "$_i1_text" ] && _i1_text="$_i1_key"
@@ -102,7 +104,7 @@ dump_i18n() {
     [ -n "$_dic_file" ] || return 1
 
     # 自动收集当前已注册的语言（取变量名最后一段作为语言标识）
-    _dic_langs=$(set | grep '^_I18N_' | sed -n 's/^_I18N_.*_\([^=]*\)=.*/\1/p' | sort -u)
+    _dic_langs=$(env | grep '^_I18N_' | sed -n 's/^_I18N_.*_\([^=]*\)=.*/\1/p' | sort -u)
 
     # 若未找到任何语言（极少情况），输出一个兼容的默认表头
     if [ -z "$_dic_langs" ]; then
@@ -117,13 +119,13 @@ dump_i18n() {
     printf '%s\n' "$_hdr" > "$_dic_file"
 
     # 收集所有 keys（变量名中 _I18N_ 与最后一个 '_' 之间的部分）
-    _dic_keys=$(set | grep '^_I18N_' | sed -n 's/^_I18N_\(.*\)_\([^=]*\)=.*/\1/p' | sort -u)
+    _dic_keys=$(env | grep '^_I18N_' | sed -n 's/^_I18N_\(.*\)_\([^=]*\)=.*/\1/p' | sort -u)
 
     for _dic_k in $_dic_keys; do
         _out="${_dic_k}"
         for _lang in $_dic_langs; do
             _var="_I18N_${_dic_k}_${_lang}"
-            eval "_val=\"\${${_var}:-}\""
+            _val=$(env | awk -F= -v key="${_var}" '$1==key {print substr($0, length($1)+2); exit}')
             _out="${_out}|${_val}"
         done
         printf '%s\n' "$_out" >> "$_dic_file"

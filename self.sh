@@ -55,6 +55,20 @@ EOF
         return 1
     fi
 
+    # Validate module id to avoid path traversal / invalid filenames
+    _len=${#_module_id}
+    if [ "$_len" -lt 1 ] || [ "$_len" -gt 128 ]; then
+        error "Invalid module id length: $_len"
+        return 1
+    fi
+    case "$_module_id" in
+        [A-Za-z][A-Za-z0-9._-]* ) ;;
+        * )
+            error "Invalid module id: $_module_id"
+            return 1
+            ;;
+    esac
+
     # Use KernelSU path for storage
     _root="/data/adb/ksu/module_configs"
     _store="$_root/$_module_id"
@@ -62,9 +76,16 @@ EOF
         error "Unable to create config directory: $_store"
         return 1
     }
+    # Restrict directory permissions (owner-only) to avoid accidental exposure
+    chmod 0700 "$_store" 2>/dev/null || true
+
     _persist="$_store/persist"
     _tmp="$_store/tmp"
-    mkdir -p "$_persist" "$_tmp"
+    mkdir -p "$_persist" "$_tmp" || {
+        error "Unable to create config persist/tmp directories: $_persist $_tmp"
+        return 1
+    }
+    chmod 0700 "$_persist" "$_tmp" 2>/dev/null || true
 
     # Validate key according to ^[a-zA-Z][a-zA-Z0-9._-]+$ and length constraints
     _validate_key() {
@@ -136,7 +157,9 @@ EOF
                 error "mktemp command failed"
                 return 1
             }
-            
+            # Ensure the temporary file is owner-only (defensive)
+            chmod 0600 "$_tf" 2>/dev/null || true
+
             if [ "$_stdin" = true ]; then
                 cat - > "$_tf"
             elif [ $# -eq 0 ] && [ ! -t 0 ]; then
@@ -173,8 +196,12 @@ EOF
 
             if [ "$_temp" = true ]; then
                 mv -f "$_tf" "$_tmp/$_key" 2>/dev/null || ( cp -f "$_tf" "$_tmp/$_key" 2>/dev/null && rm -f "$_tf" )
+                # Ensure the stored file is owner-only
+                chmod 0600 "$_tmp/$_key" 2>/dev/null || true
             else
                 mv -f "$_tf" "$_persist/$_key" 2>/dev/null || ( cp -f "$_tf" "$_persist/$_key" 2>/dev/null && rm -f "$_tf" )
+                # Ensure the stored file is owner-only
+                chmod 0600 "$_persist/$_key" 2>/dev/null || true
             fi
             return 0
             ;;
