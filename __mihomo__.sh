@@ -139,9 +139,8 @@ mihomo_start() {
 
 mihomo_stop() {
     if is_mihomo_running; then
-        kill $(pgrep -f "mihomo")
-        is_mihomo_running || return 0
-        return 1
+        pkill -f "mihomo"
+        is_mihomo_running
     else
         return 1
     fi
