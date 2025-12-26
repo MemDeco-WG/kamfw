@@ -149,8 +149,8 @@ mihomo_stop() {
 toggle_mihomo() {
     if is_mihomo_running; then
         info "Stop and check"
-        mihomo_stop        
-    else     
+        mihomo_stop
+    else
         info "Start and check"
         mihomo_start
     fi

@@ -187,32 +187,32 @@ set_i18n "FORCE_UPDATE_FILE" \
 # 用法2: t "模板 {} 文本" "参数1" "参数2"
 t() {
     _template=""
-    
+
     # 检查是否有管道输入
     if [ ! -t 0 ]; then
         _template=$(cat)
     fi
-    
+
     # 如果第一个参数是模板（没有管道输入或管道为空）
     if [ -z "$_template" ] && [ $# -gt 0 ]; then
         _template="$1"
         shift
     fi
-    
+
     [ -z "$_template" ] && return 1
-    
+
     _result="$_template"
     _arg_index=1
-    
+
     # 依次替换每个占位符
     for _arg in "$@"; do
         # 使用sed替换第_arg_index个出现的{}
         _result=$(printf '%s' "$_result" | sed "s/{}/$(printf '%s' "$_arg" | sed 's/[\/&]/\\&/g')/")
         _arg_index=$((_arg_index + 1))
     done
-    
+
     printf '%s' "$_result"
-    
+
     unset _template _result _arg_index _arg
 }
 

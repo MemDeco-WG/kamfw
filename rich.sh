@@ -6,7 +6,7 @@ _do_update_file() {
     # 复制已安装模块的文件并重命名
     _installed_file="$_installed_module_path/$_relative_path"
     _temp_file="$MODPATH/$_relative_path"
-    
+
     # 重命名新文件
     mv "$_temp_file" "$_temp_file.update"
     # .update表示这个是新模块更新的文件
@@ -21,7 +21,7 @@ _do_update_file() {
         # 复制文件，保持权限
         cp -a "$_installed_file" "$_temp_file"
     fi
-    
+
     unset _relative_path _module_id _installed_module_path
     unset _installed_file _temp_file _temp_dir
     return 0
@@ -196,7 +196,7 @@ confirm() {
         "NO" \
             'return 1' \
         "$_default"
-    
+
     unset _question _default
 }
 
@@ -206,24 +206,24 @@ confirm() {
 # 选择否时，会复制已安装模块的文件并重命名为.update
 confirm_update_file() {
     _relative_path="$1"
-    
+
     # 检查MODPATH环境变量
     [ -z "${MODPATH:-}" ] && return 0
-    
+
     # 检查参数
     [ -z "$_relative_path" ] && return 0
-    
+
     # 获取模块ID
     _module_id=""
     if [ -f "$MODPATH/module.prop" ]; then
         _module_id=$(sed -n 's/^id=//p' "$MODPATH/module.prop" | head -n1)
     fi
     [ -z "$_module_id" ] && return 0
-    
+
     # 检查模块是否已安装
     _installed_module_path="/data/adb/modules/$_module_id"
     [ ! -d "$_installed_module_path" ] && return 0
-    
+
     # 直接使用ask函数，默认选择否(1)
     # 使用t函数动态构建标题
     _final_title="$(i18n 'FORCE_UPDATE_FILE' | t "$_relative_path")"
@@ -233,7 +233,7 @@ confirm_update_file() {
         "$(i18n 'NO')" \
             '_do_update_file' \
         1
-    
+
     # 这个函数不会执行到这里，因为ask会处理返回
 }
 
