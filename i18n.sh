@@ -156,4 +156,28 @@ set_i18n "ASK_GUIDE_CONTENT" \
 
 # 调试相关
 set_i18n "DEBUG_MODE" "zh" "是否开启调试模式？" "en" "Enable debug mode?" "ja" "デバッグモードを有効にしますか？" "ko" "디버г 모드를 활성화하시겠습니까?"
-set_i18n "DEBUG_ON"   "zh" "调试模式已开启" "en" "Debug mode enabled" "ja" "デバッグモードが有効です" "ko" "디버그 모드가 활성화되었습니다"
+set_i18n "DEBUG_ON" "zh" "调试模式已开启" "en" "Debug mode enabled" "ja" "デバッグモードが有効です" "ko" "디버그 모드가 활성화되었습니다"
+
+# Template function for string substitution
+# Usage: echo "Hello " | t "World"
+t() {
+    _template=""
+    if [ -t 0 ]; then
+        # If stdin is a terminal, use the argument as template
+        printf '%s' "$_template"
+    else
+        # If piped, read from stdin and substitute
+        while IFS= read -r _line || [ -n "$_line" ]; do
+            _result="$_line"
+            shift 1
+            _arg_num=1
+            while [ $# -gt 0 ]; do
+                _result=$(printf '%s' "$_result" | sed "s/\\\$_arg_num//g")
+                shift
+                _arg_num=$((_arg_num + 1))
+            done
+            printf '%s\n' "$_result"
+        done
+    fi
+    unset _template _line _result _arg_num
+}

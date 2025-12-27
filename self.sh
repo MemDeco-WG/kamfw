@@ -60,3 +60,26 @@ config() {
         *) return 1 ;;
     esac
 }
+
+# 禁用模块
+disable() {
+    [ -z "$MODDIR" ] && return 1
+    
+    if touch "$MODDIR/disable"; then
+        print "* 模块已禁用 (重启后生效)"
+    else
+        print "! 禁用操作失败：权限不足或目录不存在"
+        return 1
+    fi
+}
+
+# 启用模块
+enable() {
+    [ -z "$MODDIR" ] && return 1
+    if rm -f "$MODDIR/disable"; then
+        print "* 模块已启用 (重启后生效)"
+    else
+        print "! 启用操作失败"
+        return 1
+    fi
+}
