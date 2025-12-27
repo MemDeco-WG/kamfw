@@ -7,6 +7,10 @@ setup_termux_env
 export PATH="$MODDIR/.local/bin:/data/adb/kam/bin:$PATH"
 export LD_LIBRARY_PATH="$MODDIR/.local/lib:/data/adb/kam/lib:$LD_LIBRARY_PATH"
 
+if [ -d "$MODDIR/.local/bin"  ]; then
+    
+fi
+
 for _f in "$MODDIR"/.local/bin/*; do
     [ -e "$_f" ] || continue
     _f_name=$(basename "$_f")

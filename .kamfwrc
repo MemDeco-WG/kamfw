@@ -5,7 +5,7 @@
 # 跨 Root 管理器工具框架--模块开发辅助库
 #
 ##########################################################################################
-export MODDIR=${MODPATH:-${0%/*}}
+export MODDIR=${MODPATH:-${1:-${0%/*}}}
 
 # 环境变量
 
@@ -53,6 +53,10 @@ print() {
              printf 'ui_print %s\nui_print\n' "$_print_msg" >&"$OUTFD"
          fi
      fi
+}
+
+has_command() {
+    type "$1" >/dev/null 2>&1
 }
 
 # =============================================================================
@@ -140,4 +144,63 @@ if is_ap; then
     import ap
 fi
 
+ui_print() {
+    print "$@"
+}
 
+if ! has_command "abort"; then
+    abort() {
+        print "ERROR: $1"
+        exit 1
+    }
+fi
+
+if ! has_command "set_perm"; then
+    set_perm() {
+        [ $# -lt 4 ] && abort "set_perm needs at least 4 arguments"
+        [ -e "$1" ] || abort "set_perm: Target '$1' not found"
+        
+        _target=$1; _owner=$2; _grp=$3; _perm=$4; _con=${5:-u:object_r:system_file:s0}
+        
+        chown "$_owner:$_grp" "$_target"
+        chmod "$_perm" "$_target"
+        
+        if has_command chcon; then
+            chcon "$_con" "$_target" 2>/dev/null || true
+        elif has_command restorecon; then
+            restorecon "$_target"
+        fi
+    }
+fi
+
+if ! has_command "set_perm_recursive"; then
+    set_perm_recursive() {
+        [ $# -lt 5 ] && abort "set_perm_recursive needs at least 5 arguments"
+        [ -d "$1" ] || abort "set_perm_recursive: Dir '$1' not found"
+        
+        _dir=$1; _owner=$2; _grp=$3; _dperm=$4; _fperm=$5; _con=${6:-u:object_r:system_file:s0}
+        
+        chown -R "$_owner:$_grp" "$_dir"
+        find "$_dir" -type d -exec chmod "$_dperm" {} +
+        find "$_dir" -type f -exec chmod "$_fperm" {} +
+        
+        if has_command chcon; then
+            chcon -R "$_con" "$_dir" 2>/dev/null || true
+        elif has_command restorecon; then
+            restorecon -R "$_dir"
+        fi
+    }
+fi
+# ui_print <msg>
+#     Print message to console. Avoid 'echo'.
+#
+# abort <msg>
+#     Print error message and terminate installation.
+#
+# set_perm <target> <owner> <group> <permission> [context]
+#     Set permissions for a file.
+#     Default context: "u:object_r:system_file:s0"
+#
+# set_perm_recursive <dir> <owner> <group> <dirperm> <fileperm> [context]
+#     Recursively set permissions for a directory.
+#     Default context: "u:object_r:system_file:s0"
