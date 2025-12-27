@@ -1,6 +1,16 @@
 # shellcheck shell=ash
+# 判断是否在交互式终端（TTY）中运行
+is_tty() {
+    # [ -t 0 ] 检查标准输入是否连接到终端
+    # [ -t 1 ] 检查标准输出是否连接到终端
+    if [ -t 0 ] || [ -t 1 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
 
-if [ -t 0 ]; then
+if is_tty; then
     export COL_RED='\033[0;31m'
     export COL_GRN='\033[0;32m'
     export COL_YLW='\033[0;33m'
@@ -253,3 +263,4 @@ is_ap() {
     _ia_mgr=$(get_manager)
     [ "$_ia_mgr" = "ap" ]
 }
+

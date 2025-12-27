@@ -178,7 +178,7 @@ ask() {
 
         return
 
-    }
+}
 
 
 # confirm - Simple confirmation dialog with customizable default

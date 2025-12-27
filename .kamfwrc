@@ -8,8 +8,7 @@
 export MODDIR=${MODPATH:-${0%/*}}
 
 # 环境变量
-export PATH=${MODDIR}/.local/bin/:$PATH：/data/data/com.termux/files/usr/bin:/data/data/com.termux/files/usr/bin
-export LD_LIBRARY_PATH=${MODDIR}/.local/lib/:$LD_LIBRARY_PATH:/data/data/com.termux/files/usr/lib
+
 export HOME=${MODDIR}
 
 export KAMFW_DIR=${MODDIR}/lib/kamfw
@@ -28,11 +27,9 @@ fi
 # =============================================================================
 
 
-
 # =============================================================================
 # 基础函数
 # =============================================================================
-
 
 # terminal print (tty)
 tprint() {
@@ -122,26 +119,14 @@ kamfw() {
 
 import() { kamfw load "$@"; }
 
-if [ -n "${PS1:-}" ]; then
-  alias import='kamfw load'
-fi
-
-
+[ -t 0 ] && alias import='kamfw load'
 
 # =============================================================================
-# Language selection helpers (moved to module)
+# INIT
 # =============================================================================
-# Language helper functions have been moved out of the core config into a
-# dedicated module so that they can be loaded on demand:
-#
-#   - module file: lib/kamfw/lang.sh
-#   - import it where needed:  import lang
-#
-# The module persists the override to: ${KAMFW_DIR}/.kamfw_lang
-# (Use `select_language`, `set_kam_language`/`set_lang`, `unset_kam_language`/`unset_lang`.)
 
-# Keep existing behavior by importing the base module last
 import base
+import stage
 import i18n
 
 if is_magisk; then
@@ -155,3 +140,12 @@ fi
 if is_ap; then
     import ap
 fi
+
+if is_installing; then
+    import __customize__
+elif is_uninstalling; then   
+    import __uninstall__  
+else
+    import __runtime__
+fi
+
