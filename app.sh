@@ -1,51 +1,33 @@
 # shellcheck shell=ash
 
-import launcher
-
-# --- 功能函数 ---
-
-# 参数: $1 = 包名
-is_app_installed() {
-    [ -z "$1" ] && return 1
-    pm list packages "$1" 2>/dev/null | grep -qx "package:$1"
+_pm_path_safe() {
+    # 如果 pm path 返回 package:/data/app/.../base.apk，截取路径部分
+    pm path "$1" 2>/dev/null | head -n 1 | sed 's/^package://;s/base.apk$//'
 }
 
-# 用法: require_app <包名> <错误提示信息> [<launch 参数...>]
-# - 如果应用已安装，返回 0
-# - 否则：
-#   - 如果存在 `app` 函数，调用 `app "<错误提示信息>"`，若返回 0 则返回 0，否则终止并显示 <错误提示信息>
-#   - 否则，如果提供了额外参数并存在 `launch`，则调用 `launch` 传入这些参数，若返回 0 则返回 0，否则终止并显示 <错误提示信息>
-#   - 否则调用 `abort "<错误提示信息>"` 退出
-require_app() {
-    _pkg="$1"
-    _msg="${2:-Missing app: $1}"
+is_app_installed() {
+    _i_pkg="$1"
+    [ -z "$_i_pkg" ] && return 1
 
-    if [ -z "$_pkg" ]; then
-        abort "Missing package name"
+    # 尝试通过 pm path 获取 APK 目录
+    _i_apkDir=$(_pm_path_safe "$_i_pkg")
+    if [ -n "$_i_apkDir" ] && [ -d "$_i_apkDir" ]; then
+        return 0
     fi
+    return 1
+}
 
-    if is_app_installed "$_pkg"; then
+require_app() {
+    _r_pkg="$1"
+    _r_msg="$2"
+
+    if is_app_installed "$_r_pkg"; then
         return 0
     fi
 
-    # If a helper `app` function exists, invoke it with the error message and honor its return code.
-    if command -v app >/dev/null 2>&1; then
-        app "$_msg"
-        if [ $? -eq 0 ]; then
-            return 0
-        fi
-        abort "$_msg"
-    fi
-
-    # If extra args were provided and `launch` exists, delegate to it and honor its return code.
-    if [ $# -gt 2 ]; then
-        shift 2
-        launch "$@"
-        if [ $? -eq 0 ]; then
-            return 0
-        fi
-        abort "$_msg"
-    fi
-
-    abort "$_msg"
+    error "!"
+    error "! $_r_msg"
+    error "!"
+    
+    return 1
 }
