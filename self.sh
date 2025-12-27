@@ -1,251 +1,62 @@
 # shellcheck shell=ash
 
-# Unified configuration helper
-# - When running under KernelSU (is_ksu), forwards to `ksud module config ...`
-# - Otherwise uses a lightweight file-backed fallback (persist + tmp) with the
-#   same CLI semantics (get/set/list/delete/clear) and supports --temp and --stdin.
-#
-# Usage (same as ksud):
-#   config get <key>
-#   config set [--temp] [--stdin] <key> [value]
-#   config list
-#   config delete [--temp] <key>
-#   config clear [--temp]
 config() {
-    _cmd="$1"
-    [ -n "$_cmd" ] && shift
-
-    # Help / usage
-    if [ -z "$_cmd" ] || [ "$_cmd" = "help" ]; then
-        cat <<'EOF'
-Usage:
-  config get <key>
-  config set [--temp] [--stdin] <key> [value]
-  config list
-  config delete [--temp] <key>
-  config clear [--temp]
-EOF
-        return 0
-    fi
-
-    # If KernelSU is present, delegate directly to ksud (preserve the behavior)
+    _cmd="$1"; [ -z "$_cmd" ] || shift
+    
+    # 1. KernelSU Delegate
     if is_ksu; then
-        _ksud_bin=$(command -v ksud || echo "/data/adb/ksud")
-        # Ensure KSU_MODULE is set when possible so ksud knows which module to operate on
-        if [ -z "${KSU_MODULE:-}" ] && [ -n "${MODDIR:-}" ] && [ -f "$MODDIR/module.prop" ]; then
-            _ksu_id=$(sed -n 's/^id=//p' "$MODDIR/module.prop" | head -n1)
-            [ -n "$_ksu_id" ] && export KSU_MODULE="$_ksu_id"
-        fi
-        "$_ksud_bin" module config "$_cmd" "$@"
+        _ksud=$(command -v ksud || echo "/data/adb/ksud")
+        [ -n "$KSU_MODULE" ] || [ ! -f "$MODDIR/module.prop" ] || export KSU_MODULE=$(sed -n 's/^id=//p' "$MODDIR/module.prop")
+        "$_ksud" module config "$_cmd" "$@"
         return $?
     fi
 
-    # --- Fallback implementation (file-backed) ---
-
-    # Determine module id (prefer KSU_MODULE, then module.prop id, then MODDIR basename)
-    _module_id="${KSU_MODULE:-}"
-    if [ -z "$_module_id" ] && [ -n "${MODDIR:-}" ] && [ -f "$MODDIR/module.prop" ]; then
-        _module_id=$(sed -n 's/^id=//p' "$MODDIR/module.prop" | head -n1)
-    fi
-    if [ -z "$_module_id" ] && [ -n "${MODDIR:-}" ]; then
-        _module_id="${MODDIR##*/}"
-    fi
-    if [ -z "$_module_id" ]; then
-        error "Unable to determine module id for config fallback"
-        return 1
+    # 2. Help
+    if [ "$_cmd" = "help" ] || [ -z "$_cmd" ]; then
+        printf "Usage: config [get|set|list|delete|clear] [--temp] [--stdin] <key> [value]\n"
+        return 0
     fi
 
-    # Validate module id to avoid path traversal / invalid filenames
-    _len=${#_module_id}
-    if [ "$_len" -lt 1 ] || [ "$_len" -gt 128 ]; then
-        error "Invalid module id length: $_len"
-        return 1
-    fi
-    case "$_module_id" in
-        [A-Za-z][A-Za-z0-9._-]* ) ;;
-        * )
-            error "Invalid module id: $_module_id"
-            return 1
-            ;;
-    esac
+    # 3. Path & Module ID Setup
+    _mod_id="${KSU_MODULE:-${MODDIR##*/}}"
+    [ -n "$_mod_id" ] || { error "Module ID unknown"; return 1; }
+    
+    _base="/data/adb/ksu/module_configs/$_mod_id"
+    _p_dir="$_base/persist"; _t_dir="$_base/tmp"
+    mkdir -p "$_p_dir" "$_t_dir" && chmod 0700 "$_base" "$_p_dir" "$_t_dir"
 
-    # Use KernelSU path for storage
-    _root="/data/adb/ksu/module_configs"
-    _store="$_root/$_module_id"
-    mkdir -p "$_store" || {
-        error "Unable to create config directory: $_store"
-        return 1
-    }
-    # Restrict directory permissions (owner-only) to avoid accidental exposure
-    chmod 0700 "$_store" 2>/dev/null || true
-
-    _persist="$_store/persist"
-    _tmp="$_store/tmp"
-    mkdir -p "$_persist" "$_tmp" || {
-        error "Unable to create config persist/tmp directories: $_persist $_tmp"
-        return 1
-    }
-    chmod 0700 "$_persist" "$_tmp" 2>/dev/null || true
-
-    # Validate key according to ^[a-zA-Z][a-zA-Z0-9._-]+$ and length constraints
-    _validate_key() {
-        _k="$1"
-        if [ -z "$_k" ]; then
-            error "Key cannot be empty"
-            return 1
-        fi
-        _len=${#_k}
-        if [ "$_len" -lt 2 ] || [ "$_len" -gt 256 ]; then
-            error "Key length must be between 2 and 256 characters"
-            return 1
-        fi
-        case "$_k" in
-            [A-Za-z][A-Za-z0-9._-]* ) return 0 ;;
-            * )
-                error "Invalid key format. Must match ^[a-zA-Z][a-zA-Z0-9._-]+$"
-                return 1
-                ;;
-        esac
-    }
-
-    # Count unique keys across persist + tmp
-    _count_entries() {
-        _a=$(ls -1 "$_persist" 2>/dev/null || true)
-        _b=$(ls -1 "$_tmp" 2>/dev/null || true)
-        _both=$(printf '%s\n%s\n' "$_a" "$_b" | awk NF | sort -u 2>/dev/null || true)
-        if [ -z "$_both" ]; then
-            printf '0'
-        else
-            printf '%s' "$_both" | wc -l
-        fi
-    }
-
+    # 4. Command Logic
     case "$_cmd" in
         get)
             _key="$1"
-            [ -n "$_key" ] || { error "Missing key"; return 1; }
-            _validate_key "$_key" || return 1
-            if [ -f "$_tmp/$_key" ]; then
-                cat "$_tmp/$_key"
-                return 0
-            elif [ -f "$_persist/$_key" ]; then
-                cat "$_persist/$_key"
-                return 0
-            else
-                return 1
-            fi
+            [ -f "$_t_dir/$_key" ] && cat "$_t_dir/$_key" && return 0
+            [ -f "$_p_dir/$_key" ] && cat "$_p_dir/$_key" && return 0
+            return 1
             ;;
         set)
-            _temp=false
-            _stdin=false
-            # Parse flags for set
+            _dir="$_p_dir"
             while [ $# -gt 0 ]; do
                 case "$1" in
-                    --temp) _temp=true; shift ;;
-                    --stdin) _stdin=true; shift ;;
-                    --) shift; break ;;
+                    --temp) _dir="$_t_dir"; shift ;;
+                    --stdin) _stdin=1; shift ;;
                     *) break ;;
                 esac
             done
-
-            _key="$1"; shift || _key=""
-            [ -n "$_key" ] || { error "Missing key"; return 1; }
-            _validate_key "$_key" || return 1
-
-            # Prepare value into a temp file (support --stdin or piped/missing value)
-            _tf=$(mktemp) || {
-                error "mktemp command failed"
-                return 1
-            }
-            # Ensure the temporary file is owner-only (defensive)
-            chmod 0600 "$_tf" 2>/dev/null || true
-
-            if [ "$_stdin" = true ]; then
-                cat - > "$_tf"
-            elif [ $# -eq 0 ] && [ ! -t 0 ]; then
-                cat - > "$_tf"
-            else
-                if [ $# -gt 0 ]; then
-                    printf '%s' "$*" > "$_tf"
-                else
-                    rm -f "$_tf" 2>/dev/null || true
-                    error "Missing value for set"
-                    return 1
-                fi
-            fi
-
-            _size=$(wc -c < "$_tf" 2>/dev/null | tr -d ' ')
-            if [ -z "$_size" ]; then _size=0; fi
-            if [ "$_size" -gt 1048576 ]; then
-                rm -f "$_tf" 2>/dev/null || true
-                error "Value too large (max 1048576 bytes)"
-                return 1
-            fi
-
-            # Enforce max entries (32 unique keys)
-            _exists=false
-            if [ -f "$_persist/$_key" ] || [ -f "$_tmp/$_key" ]; then
-                _exists=true
-            fi
-            _count=$(_count_entries)
-            if [ "$_exists" = false ] && [ "$_count" -ge 32 ]; then
-                rm -f "$_tf" 2>/dev/null || true
-                error "Maximum config entries (32) reached"
-                return 1
-            fi
-
-            if [ "$_temp" = true ]; then
-                mv -f "$_tf" "$_tmp/$_key" 2>/dev/null || ( cp -f "$_tf" "$_tmp/$_key" 2>/dev/null && rm -f "$_tf" )
-                # Ensure the stored file is owner-only
-                chmod 0600 "$_tmp/$_key" 2>/dev/null || true
-            else
-                mv -f "$_tf" "$_persist/$_key" 2>/dev/null || ( cp -f "$_tf" "$_persist/$_key" 2>/dev/null && rm -f "$_tf" )
-                # Ensure the stored file is owner-only
-                chmod 0600 "$_persist/$_key" 2>/dev/null || true
-            fi
-            return 0
+            _key="$1"; shift
+            [ -n "$_key" ] || return 1
+            if [ "$_stdin" = "1" ]; then cat > "$_dir/$_key"; else printf '%s' "$*" > "$_dir/$_key"; fi
             ;;
         list)
-            _a=$(ls -1 "$_persist" 2>/dev/null || true)
-            _b=$(ls -1 "$_tmp" 2>/dev/null || true)
-            _both=$(printf '%s\n%s\n' "$_a" "$_b" | awk NF | sort -u 2>/dev/null || true)
-            for _k in $_both; do
-                if [ -f "$_tmp/$_k" ]; then
-                    printf '%s=' "$_k"
-                    cat "$_tmp/$_k"
-                else
-                    printf '%s=' "$_k"
-                    cat "$_persist/$_k"
-                fi
-            done
-            return 0
+            { ls -1 "$_p_dir"; ls -1 "$_t_dir"; } 2>/dev/null | sort -u
             ;;
         delete)
-            _temp=false
-            if [ "$1" = "--temp" ]; then _temp=true; shift; fi
-            _key="$1"
-            [ -n "$_key" ] || { error "Missing key"; return 1; }
-            _validate_key "$_key" || return 1
-            if [ "$_temp" = true ]; then
-                rm -f "$_tmp/$_key" 2>/dev/null || true
-            else
-                rm -f "$_tmp/$_key" "$_persist/$_key" 2>/dev/null || true
-            fi
-            return 0
+            _dir="$_p_dir"; [ "$1" = "--temp" ] && { _dir="$_t_dir"; shift; }
+            rm -f "$_dir/$1"
             ;;
         clear)
-            _temp=false
-            if [ "$1" = "--temp" ]; then _temp=true; fi
-            if [ "$_temp" = true ]; then
-                rm -f "$_tmp"/* 2>/dev/null || true
-            else
-                rm -f "$_persist"/* 2>/dev/null || true
-            fi
-            return 0
+            _dir="$_p_dir"; [ "$1" = "--temp" ] && { _dir="$_t_dir"; shift; }
+            rm -rf "$_dir" && mkdir -m 0700 -p "$_dir"
             ;;
-        *)
-            error "Unknown command: $_cmd"
-            return 1
-            ;;
+        *) return 1 ;;
     esac
 }
