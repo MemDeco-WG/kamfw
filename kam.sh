@@ -1,5 +1,21 @@
 # shellcheck shell=ash
 
+if is_magisk; then
+    import magisk
+fi
+
+if is_ksu; then
+    import ksu
+fi
+
+if is_ap; then
+    import ap
+fi
+
+ui_print() {
+    print "$@"
+}
+
 # kam install
 # kam manager
 kam (){

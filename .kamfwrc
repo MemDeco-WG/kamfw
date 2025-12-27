@@ -135,18 +135,7 @@ import() { kamfw load "$@"; }
 
 import base
 import i18n
-
-if is_magisk; then
-    import magisk
-fi
-
-if is_ksu; then
-    import ksu
-fi
-
-if is_ap; then
-    import ap
-fi
+import kam
 
 ui_print() {
     print "$@"
