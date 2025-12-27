@@ -126,7 +126,6 @@ import() { kamfw load "$@"; }
 # =============================================================================
 
 import base
-import stage
 import i18n
 
 if is_magisk; then
@@ -141,14 +140,4 @@ if is_ap; then
     import ap
 fi
 
-if is_installing; then
-    print "customize"
-    import __customize__
-elif is_uninstalling; then   
-    print "uninstall"
-    import __uninstall__  
-else
-    print "runtime"
-    import __runtime__
-fi
 
