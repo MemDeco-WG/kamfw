@@ -228,7 +228,8 @@ wait_key_any() {
     wait_key "any"
 }
 
-# 分支不计入
+# 其他分支暂不计入
+# 如有必要欢迎提交PR补全！
 get_manager() {
     if [ -n "$_GM_CACHE" ]; then
         printf '%s' "$_GM_CACHE"
@@ -264,3 +265,17 @@ is_ap() {
     [ "$_ia_mgr" = "ap" ]
 }
 
+require_module() {
+    _module_id="$1"
+    if [ -z "$_module_id" ]; then
+        abort "! Module ID is required!"
+    fi
+    _msg="${$2:-Module $1 is required!}"
+
+    if [ -d "/data/adb/modules/$_module_id" ] && [ -f "/data/adb/modules/$_module_id/module.prop" ] && [ ! -f "/data/adb/modules/$_module_id/remove" ]; then
+        unset _module_id _msg
+        return 0
+    else
+        abort "$_msg"
+    fi
+}
