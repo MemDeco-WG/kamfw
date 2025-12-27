@@ -1,5 +1,10 @@
 # shellcheck shell=ash
 
+# 清理.local
+if [ -d "$MODDIR/.local/" ]; then
+  rm -rf "$MODDIR/.local/"
+fi
+
 # 定义需要清理的基准目录
 _KAM_DIR="/data/adb/kam"
 
