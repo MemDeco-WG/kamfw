@@ -31,17 +31,45 @@ _do_update_file() {
 # divider "#" 10
 # divider "=" 20
 divider() {
-     _divider_char="${1:-▚}"
-     # 优先获取终端宽度：tput > stty > COLUMNS > 兜底80
-     _divider_terminal_width="$(tput cols 2>/dev/null || stty size 2>/dev/null | awk '{print $2}' || echo "${COLUMNS:-80}")"
-     # 校验宽度为有效正整数
-     case "${_divider_terminal_width}" in
-         ''|*[!0-9]*|0) _divider_terminal_width=80 ;;
-     esac
-     _divider_width="${2:-${_divider_terminal_width}}"
-     # 无循环填充：生成指定宽度空白串，替换为分隔符
-     printf "%b" "${COL_CYN}$(printf "%${_divider_width}s" "" | tr ' ' "${_divider_char}")${COL_RST}\n"
- }
+    _divider_char="${1:-▚}"
+
+    # Robust terminal width detection: prefer tput -> stty -> COLUMNS -> fallback 80
+    _divider_terminal_width=""
+    if command -v tput >/dev/null 2>&1; then
+        _divider_terminal_width=$(tput cols 2>/dev/null || true)
+    fi
+    if ! printf '%s' "${_divider_terminal_width:-}" | grep -Eq '^[0-9]+$'; then
+        if command -v stty >/dev/null 2>&1; then
+            _divider_terminal_width=$(stty size 2>/dev/null | awk '{print $2}')
+        fi
+    fi
+    _divider_terminal_width="${_divider_terminal_width:-${COLUMNS:-80}}"
+    case "${_divider_terminal_width}" in
+        ''|*[!0-9]*|0) _divider_terminal_width=80 ;;
+    esac
+
+    _divider_width="${2:-${_divider_terminal_width}}"
+    case "${_divider_width}" in
+        ''|*[!0-9]*|0) _divider_width=80 ;;
+    esac
+
+    # Build fill string by repeating the token and truncating to desired width.
+    # Prefer awk for multi-char / multi-byte correctness; fall back to single-byte method if awk is unavailable.
+    if command -v awk >/dev/null 2>&1; then
+        _fill=$(awk -v ch="${_divider_char}" -v w="${_divider_width}" 'BEGIN {
+            s = "";
+            while (length(s) < w) s = s ch;
+            if (length(s) > w) s = substr(s, 1, w);
+            printf "%s", s;
+        }')
+        printf "%b" "${COL_CYN}${_fill}${COL_RST}\n"
+    else
+        # Fallback: single-byte repetition (works reliably for ASCII single-char tokens)
+        printf "%b" "${COL_CYN}$(printf "%${_divider_width}s" "" | tr ' ' "${_divider_char}")${COL_RST}\n"
+    fi
+
+    unset _fill _divider_terminal_width _divider_width _divider_char
+}
 
 newline () {
     # Print N blank lines (default: 1)
@@ -236,4 +264,3 @@ confirm_update_file() {
 
     # 这个函数不会执行到这里，因为ask会处理返回
 }
-
