@@ -142,10 +142,13 @@ if is_ap; then
 fi
 
 if is_installing; then
+    print "customize"
     import __customize__
 elif is_uninstalling; then   
+    print "uninstall"
     import __uninstall__  
 else
+    print "runtime"
     import __runtime__
 fi
 
