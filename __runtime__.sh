@@ -1,8 +1,6 @@
 # shellcheck shell=ash
 import __termux__
 
-mkdir -p /data/adb/kam/bin /data/adb/kam/lib
-
 setup_termux_env
 
 export PATH="$MODDIR/.local/bin:$PATH"
