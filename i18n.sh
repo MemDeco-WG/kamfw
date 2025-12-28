@@ -146,6 +146,55 @@ set_i18n "REFUSE"    "zh" "残忍拒绝" "en" "Refuse" "ja" "拒否" "ko" "거�
 set_i18n "SUCCESS"   "zh" "成功" "en" "Success" "ja" "成功" "ko" "성공"
 set_i18n "FAILED"    "zh" "失败" "en" "Failed" "ja" "失敗" "ko" "실패"
 
+# YES/NO used by confirm dialogs
+set_i18n "YES" "zh" "是" "en" "Yes" "ja" "はい" "ko" "예"
+set_i18n "NO"  "zh" "否" "en" "No"  "ja" "いいえ" "ko" "아니요"
+
+# Force update confirmation (use placeholder $_1; keep literal by escaping $)
+set_i18n "FORCE_UPDATE_FILE" \
+    "zh" "文件 \$_1 已安装，是否强制更新？" \
+    "en" "File \$_1 is already installed. Force update it?" \
+    "ja" "ファイル \$_1 は既にインストールされています。強制的に更新しますか？" \
+    "ko" "파일 \$_1 이 이미 설치되어 있습니다. 강제로 업데이트하시겠습니까？"
+
+# Language selection / labels
+set_i18n "SWITCH_LANGUAGE" \
+    "zh" "选择语言" \
+    "en" "Switch language" \
+    "ja" "言語を切り替え" \
+    "ko" "언어 선택"
+
+set_i18n "LANG_AUTO" \
+    "zh" "自动 (系统)" \
+    "en" "Auto (system)" \
+    "ja" "自動（システム）" \
+    "ko" "자동(시스템)"
+
+# Save messages for language persistence
+set_i18n "LANG_SAVE" \
+    "zh" "语言已保存" \
+    "en" "Language saved" \
+    "ja" "言語が保存されました" \
+    "ko" "언어가 저장되었습니다"
+
+set_i18n "LANG_SAVE_ERROR" \
+    "zh" "写入语言设置失败" \
+    "en" "Failed to write language override" \
+    "ja" "言語設定の保存に失敗しました" \
+    "ko" "언어 설정을 기록하지 못했습니다"
+
+# Language names (upper-case keys used in menu generation)
+set_i18n "LANG_EN" "zh" "ENGLISH" "en" "ENGLISH" "ja" "ENGLISH" "ko" "ENGLISH"
+set_i18n "LANG_ZH" "zh" "中文"    "en" "中文"    "ja" "中文"    "ko" "中文"
+set_i18n "LANG_JA" "zh" "日本語" "en" "日本語" "ja" "日本語" "ko" "日本語"
+set_i18n "LANG_KO" "zh" "한국어" "en" "한국어" "ja" "한국어" "ko" "한국어"
+
+# Language names (lower-case variants used in success messages)
+set_i18n "lang_en" "zh" "ENGLISH" "en" "ENGLISH" "ja" "ENGLISH" "ko" "ENGLISH"
+set_i18n "lang_zh" "zh" "中文"    "en" "中文"    "ja" "中文"    "ko" "中文"
+set_i18n "lang_ja" "zh" "日本語" "en" "日本語" "ja" "日本語" "ko" "日本語"
+set_i18n "lang_ko" "zh" "한국어" "en" "한국어" "ja" "한국어" "ko" "한국어"
+
 # 操作指南 (支持多行)
 set_i18n "ASK_GUIDE_TITLE" "zh" "🎮 操作指南 🎮" "en" "🎮 Control Guide 🎮" "ja" "🎮 操作ガイド 🎮" "ko" "🎮 조작 가이드 🎮"
 set_i18n "ASK_GUIDE_CONTENT" \
