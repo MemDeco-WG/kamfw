@@ -2,7 +2,7 @@
 
 config() {
     _cmd="$1"; [ -z "$_cmd" ] || shift
-    
+
     # 1. KernelSU Delegate
     if is_ksu; then
         _ksud=$(command -v ksud || echo "/data/adb/ksud")
@@ -20,7 +20,7 @@ config() {
     # 3. Path & Module ID Setup
     _mod_id="${KSU_MODULE:-${MODDIR##*/}}"
     [ -n "$_mod_id" ] || { error "Module ID unknown"; return 1; }
-    
+
     _base="/data/adb/ksu/module_configs/$_mod_id"
     _p_dir="$_base/persist"; _t_dir="$_base/tmp"
     mkdir -p "$_p_dir" "$_t_dir" && chmod 0700 "$_base" "$_p_dir" "$_t_dir"
@@ -64,7 +64,6 @@ config() {
 # 禁用模块
 disable() {
     [ -z "$MODDIR" ] && return 1
-    
     if touch "$MODDIR/disable"; then
         print "* 模块已禁用 (重启后生效)"
     else
