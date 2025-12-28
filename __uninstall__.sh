@@ -8,6 +8,12 @@ fi
 # 定义需要清理的基准目录（可由环境变量 KAM_DIR 覆盖）
 _KAM_DIR="${KAM_DIR:-/data/adb/kam}"
 
+# Sanity check: avoid accidental operations on an empty or root directory
+if [ -z "$_KAM_DIR" ] || [ "$_KAM_DIR" = "/" ]; then
+    echo "Refusing to operate on invalid KAM_DIR: '$_KAM_DIR'" >&2
+    exit 1
+fi
+
 # 尝试使用 kam.lock 来保证并发一致性：
 # - source helpers（如果存在）
 # - 尝试获取锁；若成功则在持锁下执行清理并在结束时运行 kam_lock_rebuild_locked；
@@ -17,6 +23,27 @@ if [ -f "${_KAMFW_DIR}/lock.sh" ]; then
     . "${_KAMFW_DIR}/lock.sh"
 fi
 
+# Helper: get number of hard links for a path (portable)
+# Tries common `stat` variants and falls back to parsing `ls -ld`.
+get_nlink() {
+    target="$1"
+    [ -z "$target" ] && { printf '%s' ""; return 0; }
+
+    if command -v stat >/dev/null 2>&1; then
+        # GNU stat
+        if n=$(stat -c %h "$target" 2>/dev/null); then
+            printf '%s' "$n" && return 0
+        fi
+        # BSD stat
+        if n=$(stat -f %l "$target" 2>/dev/null); then
+            printf '%s' "$n" && return 0
+        fi
+    fi
+
+    # Fallback: parse `ls -ld` output
+    ls -ld -- "$target" 2>/dev/null | awk '{print $2}' || true
+}
+
 # 记录是否在持锁模式下执行
 _run_under_lock=0
 if command -v kam_lock_acquire >/dev/null 2>&1 && kam_lock_acquire 30 "$MODDIR"; then
@@ -25,7 +52,7 @@ fi
 
 # providers 基准目录与模块 id
 _PROV_BASE="$_KAM_DIR/providers"
-_modid="${KAM_MODULE_ID:-$(basename \"$MODDIR\")}"
+_modid="${KAM_MODULE_ID:-$(basename "$MODDIR")}"
 
 for _dir_name in bin lib; do
     _target_path="$_KAM_DIR/$_dir_name"
@@ -38,8 +65,8 @@ for _dir_name in bin lib; do
     if [ ! -d "$_prov_kind_dir" ]; then
         for _f in "$_target_path"/*; do
             [ -e "$_f" ] || continue
-            _nlink=$(ls -ld "$_f" | awk '{print $2}')
-            if [ "$_nlink" -eq 1 ]; then
+            _nlink=$(get_nlink "$_f" 2>/dev/null || printf '0')
+            if [ "${_nlink:-0}" -eq 1 ]; then
                 rm -f "$_f"
             fi
         done
@@ -57,7 +84,12 @@ for _dir_name in bin lib; do
             fi
 
             # 如果还有其它 provider，则选一个（按最近时间优先）并把全局目标指向它
-            if [ -n "$(ls -A "$_pdir" 2>/dev/null)" ]; then
+            # Portable check whether provider dir contains any entries (avoids ls -A parsing)
+            _first_entry=""
+            for _e in "$_pdir"/*; do
+                [ -e "$_e" ] && _first_entry="$_e" && break
+            done
+            if [ -n "$_first_entry" ]; then
                 _winner_rel=$(ls -1t "$_pdir" 2>/dev/null | head -n 1)
                 _winner_path="${_pdir}/${_winner_rel}"
                 if [ -e "$_winner_path" ]; then
@@ -82,7 +114,14 @@ for _dir_name in bin lib; do
     fi
 
     # 如果子目录执行完清理后空了，删掉该子目录
-    [ -z "$(ls -A "$_target_path" 2>/dev/null)" ] && rm -rf "$_target_path"
+    # Remove the target subdirectory if it's empty (portable)
+    _first=""
+    for _e in "$_target_path"/*; do
+        [ -e "$_e" ] && _first="$_e" && break
+    done
+    if [ -z "$_first" ]; then
+        rm -rf "$_target_path"
+    fi
 done
 
 # 如果我们在持锁模式下执行，则在锁内进行一次 rebuild 并释放锁；
@@ -101,8 +140,12 @@ fi
 # 最后检查：如果整个 kam 目录都空了（或者只剩下空目录），彻底移除
 # 使用 -d 检查确保目录存在，ls -A 检查是否有任何残留（包括隐藏文件）
 if [ -d "$_KAM_DIR" ]; then
-    _remains=$(ls -A "$_KAM_DIR" 2>/dev/null)
-    if [ -z "$_remains" ]; then
+    # Remove the whole directory if it contains no entries (portable)
+    _first=""
+    for _e in "$_KAM_DIR"/*; do
+        [ -e "$_e" ] && _first="$_e" && break
+    done
+    if [ -z "$_first" ]; then
         rm -rf "$_KAM_DIR"
     fi
 fi

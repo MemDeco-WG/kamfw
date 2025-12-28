@@ -2,6 +2,11 @@
 import __termux__
 # Allow tests to override KAM_DIR; default to the Android path if not set
 KAM_DIR="${KAM_DIR:-/data/adb/kam}"
+# Sanity check: avoid accidental operations on an empty or root directory
+if [ -z "$KAM_DIR" ] || [ "$KAM_DIR" = "/" ]; then
+    echo "Refusing to operate on invalid KAM_DIR: '$KAM_DIR'" >&2
+    exit 1
+fi
 mkdir -p "$KAM_DIR/bin" "$KAM_DIR/lib"
 
 setup_termux_env
@@ -28,18 +33,13 @@ if [ -d "$MODDIR/.local/lib" ]; then
     set_perm_recursive "$MODDIR/.local/lib" 0 0 0700 0700 "u:object_r:system_file:s0"
 fi
 
-# 链接（采用：content-addressable objects + provider 硬链接 + 全局硬链接）
+# 链接（采用：providers 硬链接 + 全局硬链接，provider-only 简化方案）
 # 设计目标：
-#  - 对于内容相同的文件使用 object 池（/data/adb/kam/objects/<sha256>）实现去重
-#  - providers/<kind>/<name>/<modid> 保存 provider 的硬链接（方便引用计数清理）
-#  - /data/adb/kam/<kind>/<name> 为指向 object 的全局硬链接（last-wins）
+#  - providers/<kind>/<name>/<modid> 保存 provider 的硬链接（直接指向模块文件）
+#  - /data/adb/kam/<kind>/<name> 为指向 provider 的全局硬链接（last-wins）
 KAM_DIR="${KAM_DIR:-/data/adb/kam}"
 _PROV_BASE="${KAM_DIR}/providers"
-_OBJ_DIR="${KAM_DIR}/objects"
-
-# get_hash is provided by lock.sh; do not redefine here to avoid duplication.
-# If a hashing tool isn't available, lock.sh's get_hash will fail and we will
-# fall back to provider-only behavior in `link_files`.
+# provider-only: no global object pool; operations will link global targets to chosen provider
 
 link_files() {
     _lf_src="$1"
@@ -60,58 +60,57 @@ link_files() {
 
         _modid="${KAM_MODULE_ID:-$(basename "$MODDIR")}"
 
-        # 尝试使用内容哈希建立 object（优先去重）
-        if _hash=$(get_hash "$_f") 2>/dev/null; then
-            mkdir -p "$_OBJ_DIR"
-            _obj_path="${_OBJ_DIR}/${_hash}"
-
-            # 首次见到该 hash 时把 data 放到 object 池（优先 ln 零拷贝，失败时 cp）
-            if [ ! -e "$_obj_path" ]; then
-                if ! ln "$_f" "$_obj_path" 2>/dev/null; then
-                    cp -a "$_f" "$_obj_path"
-                fi
+        # Provider-only: create provider entry that points to the module file
+        if [ ! -e "${_prov_dir}/${_modid}" ]; then
+            if ! ln "$_f" "${_prov_dir}/${_modid}" 2>/dev/null; then
+                cp -a "$_f" "${_prov_dir}/${_modid}"
             fi
-
-            # 在 providers 下为该模块创建一个硬链接（指向 object）
-            if [ ! -e "${_prov_dir}/${_modid}" ]; then
-                if ! ln "$_obj_path" "${_prov_dir}/${_modid}" 2>/dev/null; then
-                    cp -a "$_obj_path" "${_prov_dir}/${_modid}"
-                fi
-            else
-                # 已存在，则更新 mtime 以标记最近安装/更新
-                touch "${_prov_dir}/${_modid}" 2>/dev/null || true
-            fi
-
-            # 将全局可见文件设置为 object 的硬链接（last-wins）
-            rm -f "$_target"
-            if ! ln "$_obj_path" "$_target" 2>/dev/null; then
-                cp -a "$_obj_path" "$_target"
-            fi
-
-            chmod 0700 "$_obj_path" 2>/dev/null || true
-            chmod 0700 "${_prov_dir}/${_modid}" 2>/dev/null || true
-            chmod 0700 "$_target" 2>/dev/null || true
         else
-            # Hash unavailable -> fallback to provider-only install (no dedupe)
-            if [ ! -e "${_prov_dir}/${_modid}" ]; then
-                if ! ln "$_f" "${_prov_dir}/${_modid}" 2>/dev/null; then
-                    cp -a "$_f" "${_prov_dir}/${_modid}"
-                fi
-            else
-                touch "${_prov_dir}/${_modid}" 2>/dev/null || true
-            fi
-
-            # Make global target point to the provider entry (prefer hardlink, fall back to symlink or copy)
-            rm -f "$_target"
-            if ! ln "${_prov_dir}/${_modid}" "$_target" 2>/dev/null; then
-                if ! ln -s "${_prov_dir}/${_modid}" "$_target" 2>/dev/null; then
-                    cp -a "${_prov_dir}/${_modid}" "$_target"
-                fi
-            fi
-
-            chmod 0700 "${_prov_dir}/${_modid}" 2>/dev/null || true
-            chmod 0700 "$_target" 2>/dev/null || true
+            # update mtime to mark recent install/update
+            touch "${_prov_dir}/${_modid}" 2>/dev/null || true
         fi
+
+        # Make global target point to the provider entry (prefer hardlink, fall back to symlink or copy)
+        rm -f "$_target"
+        if ! ln "${_prov_dir}/${_modid}" "$_target" 2>/dev/null; then
+            if ! ln -s "${_prov_dir}/${_modid}" "$_target" 2>/dev/null; then
+                cp -a "${_prov_dir}/${_modid}" "$_target"
+            fi
+        fi
+
+        chmod 0700 "${_prov_dir}/${_modid}" 2>/dev/null || true
+        chmod 0700 "$_target" 2>/dev/null || true
+    done
+}
+
+# Rebuild provider-only state: pick most-recent provider for each name and make global point to it
+provider_rebuild() {
+    mkdir -p "${KAM_DIR}/bin" "${KAM_DIR}/lib"
+    for _kind in bin lib; do
+        _prov_kind_dir="${_PROV_BASE}/${_kind}"
+        [ -d "$_prov_kind_dir" ] || continue
+        for _pdir in "$_prov_kind_dir"/*; do
+            [ -d "$_pdir" ] || continue
+            _name=$(basename "$_pdir")
+            _target_file="${KAM_DIR}/${_kind}/${_name}"
+
+            # pick winner by mtime
+            _winner_rel=$(ls -1t "$_pdir" 2>/dev/null | head -n 1)
+            _winner_path="${_pdir}/${_winner_rel}"
+
+            if [ -e "$_winner_path" ]; then
+                rm -f "$_target_file"
+                if ! ln "$_winner_path" "$_target_file" 2>/dev/null; then
+                    if ! ln -s "$_winner_path" "$_target_file" 2>/dev/null; then
+                        cp -a "$_winner_path" "$_target_file"
+                    fi
+                fi
+                chmod 0700 "$_target_file" 2>/dev/null || true
+            else
+                rm -f "$_target_file"
+                rmdir "$_pdir" 2>/dev/null || true
+            fi
+        done
     done
 }
 
@@ -128,21 +127,18 @@ if command -v kam_lock_acquire >/dev/null 2>&1; then
     if kam_lock_acquire 30 "$MODDIR"; then
         link_files "$MODDIR/.local/bin" "${KAM_DIR}/bin"
         link_files "$MODDIR/.local/lib" "${KAM_DIR}/lib"
-        # rebuild while holding the lock (efficient)
-        if command -v kam_lock_rebuild_locked >/dev/null 2>&1; then
-            kam_lock_rebuild_locked || true
-        else
-            kam_lock_rebuild || true
-        fi
+        # rebuild provider-only state (pick winners, update global links)
+        provider_rebuild || true
         kam_lock_release || true
     else
         # fallback: try to do operations without lock and rebuild at end
         link_files "$MODDIR/.local/bin" "${KAM_DIR}/bin"
         link_files "$MODDIR/.local/lib" "${KAM_DIR}/lib"
-        kam_lock_rebuild || true
+        provider_rebuild || true
     fi
 else
     # no kam lock helper (unlikely) - behave as before
     link_files "$MODDIR/.local/bin" "${KAM_DIR}/bin"
     link_files "$MODDIR/.local/lib" "${KAM_DIR}/lib"
+    provider_rebuild || true
 fi

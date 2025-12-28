@@ -178,10 +178,15 @@ kam_lock_release() {
     fi
     if [ "$_owner" = "$$" ] || [ "$_force" != "0" ]; then
         _ts=$(_kam_now)
-        {
-            printf 'released_by:%s\n' "$$"
-            printf 'released_at:%s\n' "$_ts"
-        } >> "${KAM_LOCK_FILE}" 2>/dev/null || true
+        # Make release idempotent for the same PID: avoid appending duplicate
+        # released_by/released_at entries if this PID already recorded a release.
+        _releaser="$$"
+        if ! grep -q "^released_by:${_releaser}$" "${KAM_LOCK_FILE}" 2>/dev/null; then
+            {
+                printf 'released_by:%s\n' "$_releaser"
+                printf 'released_at:%s\n' "$_ts"
+            } >> "${KAM_LOCK_FILE}" 2>/dev/null || true
+        fi
         rm -rf "${KAM_LOCK_DIR}" 2>/dev/null || true
         return 0
     else
