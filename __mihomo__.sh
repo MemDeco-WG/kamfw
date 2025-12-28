@@ -59,7 +59,7 @@ mihomo_set_ui_redirect() {
 }
 
 set_default (){
-    _url="http://127.0.0.1:9090/ui/"
+    _url="http://127.0.0.1:9090/ui/cubex"
     mihomo_set_ui_redirect "$_url"
     unset _url
 }
