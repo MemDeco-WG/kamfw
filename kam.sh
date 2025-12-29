@@ -1,20 +1,14 @@
 # shellcheck shell=ash
 
-if is_magisk; then
-    import magisk
-fi
+is_magisk && import magisk
 
-if is_ksu; then
-    import ksu
-fi
+is_ksu && import ksu
 
-if is_ap; then
-    import ap
-fi
+is_ap && import ap
 
 ui_print() {
     print "$@"
-}
+}1
 
 require_module() {
     _module_id="$1"
@@ -72,4 +66,3 @@ kam (){
 
     unset _kam_cmd
 }
-

@@ -133,6 +133,7 @@ import() { kamfw load "$@"; }
 
 import base
 import i18n
+import logging
 import kam
 
 ui_print() {
