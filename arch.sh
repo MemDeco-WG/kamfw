@@ -25,3 +25,30 @@ support_arch() {
 
     unset _arch _flag
 }
+
+# is_arch [arch...]
+# Return 0 if $ARCH matches any of the given architectures (arm|arm64|x86|x64).
+# Does not abort on invalid arguments; invalid names are ignored.
+is_arch() {
+    # No arguments -> false
+    if [ $# -eq 0 ]; then
+        return 1
+    fi
+
+    for _arch in "$@"; do
+        case "$_arch" in
+            arm|arm64|x86|x64)
+                if [ "$ARCH" = "$_arch" ]; then
+                    unset _arch
+                    return 0
+                fi
+                ;;
+            *)
+                # ignore invalid values
+                ;;
+        esac
+    done
+
+    unset _arch
+    return 1
+}
