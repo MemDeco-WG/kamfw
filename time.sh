@@ -9,7 +9,7 @@
 _kam_get_now() {
     _kn_val=$(date +%s%N 2>/dev/null)
     case "$_kn_val" in
-        *N*) date +%s ;; 
+        *N*) date +%s ;;
         *) echo "$((_kn_val / 1000000))" ;;
     esac
 }
@@ -85,16 +85,16 @@ get_time_http() {
 format_duration() {
     _d_sec=$1
     [ -z "$_d_sec" ] && _d_sec=0
-    
+
     _d_h=$((_d_sec / 3600))
     _d_m=$(( (_d_sec % 3600) / 60 ))
     _d_s=$((_d_sec % 60))
-    
+
     # Manual padding for ash compatibility
     [ "${#_d_h}" -lt 2 ] && _d_h="0$_d_h"
     [ "${#_d_m}" -lt 2 ] && _d_m="0$_d_m"
     [ "${#_d_s}" -lt 2 ] && _d_s="0$_d_s"
-    
+
     echo "${_d_h}:${_d_m}:${_d_s}"
 }
 
@@ -111,7 +111,7 @@ timestamp_to_readable() {
 get_greeting() {
     _g_hour=$(date +"%H")
     _g_hour=${_g_hour#0} # Strip leading zero to avoid octal error
-    
+
     if [ "$_g_hour" -ge 5 ] && [ "$_g_hour" -lt 12 ]; then
         echo "Good Morning"
     elif [ "$_g_hour" -ge 12 ] && [ "$_g_hour" -lt 18 ]; then

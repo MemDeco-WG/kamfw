@@ -112,26 +112,26 @@ ask() {
 
     # parse arguments: pairs of (text, command) + optional trailing default index
     while [ $# -gt 0 ]; do
-            _txt="$1"
-            shift || true
+        _txt="$1"
+        shift || true
 
-            if [ "$#" -eq 0 ]; then
-                # single trailing arg -> treat as default index
-                default_selected="$_txt"
-                break
-            fi
+        if [ "$#" -eq 0 ]; then
+            # single trailing arg -> treat as default index
+            default_selected="$_txt"
+            break
+        fi
 
-            _cmd="$1"
-            shift || true
+        _cmd="$1"
+        shift || true
 
-            # i18n for option text if it's a key
-            if printf '%s' "$_txt" | grep -q '^[[:alpha:]_][[:alnum:]_]*$'; then
-                _txt=$(i18n "$_txt")
-            fi
+        # i18n for option text if it's a key
+        if printf '%s' "$_txt" | grep -q '^[[:alpha:]_][[:alnum:]_]*$'; then
+            _txt=$(i18n "$_txt")
+        fi
 
-            __tmp="$_txt"; eval "opt_text_${_opt_count}=\"\$__tmp\""
-            __tmp="$_cmd";  eval "opt_cmd_${_opt_count}=\"\$__tmp\""
-            _opt_count=$((_opt_count + 1))
+        __tmp="$_txt"; eval "opt_text_${_opt_count}=\"\$__tmp\""
+        __tmp="$_cmd";  eval "opt_cmd_${_opt_count}=\"\$__tmp\""
+        _opt_count=$((_opt_count + 1))
     done
 
 
@@ -202,9 +202,9 @@ ask() {
                 ;;
         esac
     done
-        newline
+    newline
 
-        return
+    return
 
 }
 
@@ -220,9 +220,9 @@ confirm() {
     # 使用ask函数实现确认对话框
     ask "$_question" \
         "YES" \
-            'return 0' \
+        'return 0' \
         "NO" \
-            'return 1' \
+        'return 1' \
         "$_default"
 
     unset _question _default
@@ -257,9 +257,9 @@ confirm_update_file() {
     _final_title="$(i18n 'FORCE_UPDATE_FILE' | t "$_relative_path")"
     ask "$_final_title" \
         "$(i18n 'YES')" \
-            'unset _relative_path _module_id _installed_module_path; return 0' \
+        'unset _relative_path _module_id _installed_module_path; return 0' \
         "$(i18n 'NO')" \
-            '_do_update_file' \
+        '_do_update_file' \
         1
 
     # 这个函数不会执行到这里，因为ask会处理返回

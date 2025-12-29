@@ -5,8 +5,8 @@
 # 如果存在META-INF文件夹
 
 if [ -d "${MODDIR}/META-INF" ]; then
-  # 清理掉即可
-  rm -rf "${MODDIR}/META-INF"
+    # 清理掉即可
+    rm -rf "${MODDIR}/META-INF"
 fi
 
 # KSU 管理器：安装模块的实现

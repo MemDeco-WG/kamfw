@@ -28,6 +28,6 @@ require_app() {
     error "!"
     error "! $_r_msg"
     error "!"
-    
+
     return 1
 }

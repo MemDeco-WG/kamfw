@@ -14,8 +14,8 @@
 #
 #   # github release (latest tag), asset name may contain ${TAG} and ${ARCH} placeholders
 #   binstall --name mihomo --target "$MODPATH/.local/bin" \
-#       --repo MetaCubeX/mihomo --asset "mihomo-${ARCH}-${TAG}.gz" --arch android-arm64-v8 \
-#       --chmod 0755 --version-file "$MODPATH/mihomo.version"
+    #       --repo MetaCubeX/mihomo --asset "mihomo-${ARCH}-${TAG}.gz" --arch android-arm64-v8 \
+    #       --chmod 0755 --version-file "$MODPATH/mihomo.version"
 #
 # Notes:
 # - Uses `curl` for download; `gh` optional for resolving latest tag.
@@ -286,7 +286,7 @@ binstall() {
 
     # unset temporary vars
     unset _name _target _url _repo _tag _asset _arch _result_name _chmod _version _version_file _tmpbase \
-          _download_url _resolved_tag _tmpdir _outname _outfile _type _final_file _dest _v _cmd
+        _download_url _resolved_tag _tmpdir _outname _outfile _type _final_file _dest _v _cmd
 
     return 0
 }
