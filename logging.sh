@@ -30,69 +30,69 @@
 #   base -> i18n -> logging -> others.
 #
 set_i18n "LOGLEVEL_SET" \
-    "zh" "日志级别已设置为 %s" \
-    "en" "Log level set to %s" \
-    "ja" "ログレベルを %s に設定しました" \
-    "ko" "로그 레벨이 %s(으)로 설정되었습니다"
+	"zh" "日志级别已设置为 %s" \
+	"en" "Log level set to %s" \
+	"ja" "ログレベルを %s に設定しました" \
+	"ko" "로그 레벨이 %s(으)로 설정되었습니다"
 
 # Normalize a user-provided level to canonical name
 __kam_log_level_normalize() {
-    case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
-    0 | ERROR | ERR) printf '%s' "ERROR" ;;
-    1 | WARN | WARNING) printf '%s' "WARN" ;;
-    3 | DEBUG | DBG) printf '%s' "DEBUG" ;;
-    2 | INFO) printf '%s' "INFO" ;;
-    *) printf '%s' "INFO" ;; # default
-    esac
+	case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
+	0 | ERROR | ERR) printf '%s' "ERROR" ;;
+	1 | WARN | WARNING) printf '%s' "WARN" ;;
+	3 | DEBUG | DBG) printf '%s' "DEBUG" ;;
+	2 | INFO) printf '%s' "INFO" ;;
+	*) printf '%s' "INFO" ;; # default
+	esac
 }
 
 # Map canonical name to numeric level: ERROR=0, WARN=1, INFO=2, DEBUG=3
 __kam_log_level_value() {
-    case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
-    ERROR) printf '%s' 0 ;;
-    WARN) printf '%s' 1 ;;
-    INFO) printf '%s' 2 ;;
-    DEBUG) printf '%s' 3 ;;
-    *) printf '%s' 2 ;; # default INFO
-    esac
+	case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
+	ERROR) printf '%s' 0 ;;
+	WARN) printf '%s' 1 ;;
+	INFO) printf '%s' 2 ;;
+	DEBUG) printf '%s' 3 ;;
+	*) printf '%s' 2 ;; # default INFO
+	esac
 }
 
 # Current numeric loglevel value (DEBUG via KAM_DEBUG takes precedence)
 __kam_current_loglevel() {
-    if [ "${KAM_DEBUG:-0}" = "1" ]; then
-        printf '%s' 3
-        return 0
-    fi
-    if [ -n "${KAM_LOGLEVEL:-}" ]; then
-        __kam_log_level_value "${KAM_LOGLEVEL}"
-        return 0
-    fi
-    if [ -n "${LOGLEVEL:-}" ]; then
-        __kam_log_level_value "${LOGLEVEL}"
-        return 0
-    fi
-    # default
-    printf '%s' 2
+	if [ "${KAM_DEBUG:-0}" = "1" ]; then
+		printf '%s' 3
+		return 0
+	fi
+	if [ -n "${KAM_LOGLEVEL:-}" ]; then
+		__kam_log_level_value "${KAM_LOGLEVEL}"
+		return 0
+	fi
+	if [ -n "${LOGLEVEL:-}" ]; then
+		__kam_log_level_value "${LOGLEVEL}"
+		return 0
+	fi
+	# default
+	printf '%s' 2
 }
 
 # Check whether messages at 'LEVEL' should be emitted to console
 # Usage: __kam_should_emit "DEBUG" && echo "do it"
 __kam_should_emit() {
-    req=$(__kam_log_level_value "$1")
-    cur=$(__kam_current_loglevel)
-    [ "$cur" -ge "$req" ]
+	req=$(__kam_log_level_value "$1")
+	cur=$(__kam_current_loglevel)
+	[ "$cur" -ge "$req" ]
 }
 
 # Public setter for LOGLEVEL (canonicalizes names). Interactive feedback.
 set_loglevel() {
-    [ $# -eq 0 ] && return 0
-    lvl="$1"
-    norm="$(__kam_log_level_normalize "$lvl")"
-    export KAM_LOGLEVEL="$norm"
-    if [ -t 1 ]; then
-        print "$(i18n 'LOGLEVEL_SET' 2>/dev/null | t "$norm" 2>/dev/null || printf 'Log level set to %s' "$norm")"
-    fi
-    return 0
+	[ $# -eq 0 ] && return 0
+	lvl="$1"
+	norm="$(__kam_log_level_normalize "$lvl")"
+	export KAM_LOGLEVEL="$norm"
+	if [ -t 1 ]; then
+		print "$(i18n 'LOGLEVEL_SET' 2>/dev/null | t "$norm" 2>/dev/null || printf 'Log level set to %s' "$norm")"
+	fi
+	return 0
 }
 
 # Console colorized helpers (use print, which is the canonical console printer)
@@ -104,38 +104,38 @@ cyan() { print "${COL_CYN}$1${COL_RST}"; }
 # Wrapper functions that respect loglevel for console output. They call `log`
 # (file output) only if the message is emitted (i.e., loglevel allows it).
 info() {
-    if __kam_should_emit INFO; then
-        green "INFO: $1"
-        log "INFO: $1"
-    fi
+	if __kam_should_emit INFO; then
+		green "INFO: $1"
+		log "INFO: $1"
+	fi
 }
 
 warn() {
-    if __kam_should_emit WARN; then
-        yellow "WARN: $1"
-        log "WARN: $1"
-    fi
+	if __kam_should_emit WARN; then
+		yellow "WARN: $1"
+		log "WARN: $1"
+	fi
 }
 
 error() {
-    # Always show errors to console, but still respect loglevel check for consistency
-    red "ERROR: $1"
-    log "ERROR: $1"
+	# Always show errors to console, but still respect loglevel check for consistency
+	red "ERROR: $1"
+	log "ERROR: $1"
 }
 
 success() {
-    if __kam_should_emit INFO; then
-        green "$1"
-        log "SUCCESS: $1"
-    fi
+	if __kam_should_emit INFO; then
+		green "$1"
+		log "SUCCESS: $1"
+	fi
 }
 
 debug() {
-    # Backwards compat: KAM_DEBUG=1 turns on debug
-    if __kam_should_emit DEBUG; then
-        cyan "[DEBUG] $1"
-        log "[DEBUG] $1"
-    fi
+	# Backwards compat: KAM_DEBUG=1 turns on debug
+	if __kam_should_emit DEBUG; then
+		cyan "[DEBUG] $1"
+		log "[DEBUG] $1"
+	fi
 }
 
 # ---------------------------------------------------------------------------
@@ -144,121 +144,121 @@ debug() {
 # Behavior follows previous implementation: timestamp + cleaned (ANSI-stripped) line.
 # ---------------------------------------------------------------------------
 log() {
-    : "${MODDIR:=${0%/*}}"
-    : "${KAM_LOGFILE:=${MODDIR}/kam.log}"
-    _logfile="${KAM_LOGFILE}"
-    _mode="append"
-    _rotate_opt=""
-    _rotate_bytes=0
+	: "${MODDIR:=${0%/*}}"
+	: "${KAM_LOGFILE:=${MODDIR}/kam.log}"
+	_logfile="${KAM_LOGFILE}"
+	_mode="append"
+	_rotate_opt=""
+	_rotate_bytes=0
 
-    while [ $# -gt 0 ]; do
-        case "$1" in
-        -w | --overwrite)
-            _mode="overwrite"
-            shift
-            ;;
-        -f | --file)
-            _logfile="$2"
-            shift 2
-            ;;
-        -r | --rotate | --rotate-size)
-            _rotate_opt="$2"
-            shift 2
-            ;;
-        *) break ;;
-        esac
-    done
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		-w | --overwrite)
+			_mode="overwrite"
+			shift
+			;;
+		-f | --file)
+			_logfile="$2"
+			shift 2
+			;;
+		-r | --rotate | --rotate-size)
+			_rotate_opt="$2"
+			shift 2
+			;;
+		*) break ;;
+		esac
+	done
 
-    if [ -z "${_rotate_opt:-}" ] && [ -n "${KAM_LOG_ROTATE_SIZE:-}" ]; then
-        _rotate_opt="${KAM_LOG_ROTATE_SIZE}"
-    fi
+	if [ -z "${_rotate_opt:-}" ] && [ -n "${KAM_LOG_ROTATE_SIZE:-}" ]; then
+		_rotate_opt="${KAM_LOG_ROTATE_SIZE}"
+	fi
 
-    if [ -n "${_rotate_opt:-}" ]; then
-        case "${_rotate_opt}" in
-        *[kK])
-            _num="${_rotate_opt%[kK]}"
-            case "${_num}" in
-            '' | *[!0-9]*)
-                _rotate_bytes=0
-                ;;
-            *)
-                _rotate_bytes=$((_num * 1024))
-                ;;
-            esac
-            ;;
-        *[mM])
-            _num="${_rotate_opt%[mM]}"
-            case "${_num}" in
-            '' | *[!0-9]*)
-                _rotate_bytes=0
-                ;;
-            *)
-                _rotate_bytes=$((_num * 1048576))
-                ;;
-            esac
-            ;;
-        *[gG])
-            _num="${_rotate_opt%[gG]}"
-            case "${_num}" in
-            '' | *[!0-9]*)
-                _rotate_bytes=0
-                ;;
-            *)
-                _rotate_bytes=$((_num * 1073741824))
-                ;;
-            esac
-            ;;
-        *)
-            case "${_rotate_opt}" in
-            '' | *[!0-9]*)
-                _rotate_bytes=0
-                ;;
-            *)
-                _rotate_bytes=$((_rotate_opt))
-                ;;
-            esac
-            ;;
-        esac
-    fi
+	if [ -n "${_rotate_opt:-}" ]; then
+		case "${_rotate_opt}" in
+		*[kK])
+			_num="${_rotate_opt%[kK]}"
+			case "${_num}" in
+			'' | *[!0-9]*)
+				_rotate_bytes=0
+				;;
+			*)
+				_rotate_bytes=$((_num * 1024))
+				;;
+			esac
+			;;
+		*[mM])
+			_num="${_rotate_opt%[mM]}"
+			case "${_num}" in
+			'' | *[!0-9]*)
+				_rotate_bytes=0
+				;;
+			*)
+				_rotate_bytes=$((_num * 1048576))
+				;;
+			esac
+			;;
+		*[gG])
+			_num="${_rotate_opt%[gG]}"
+			case "${_num}" in
+			'' | *[!0-9]*)
+				_rotate_bytes=0
+				;;
+			*)
+				_rotate_bytes=$((_num * 1073741824))
+				;;
+			esac
+			;;
+		*)
+			case "${_rotate_opt}" in
+			'' | *[!0-9]*)
+				_rotate_bytes=0
+				;;
+			*)
+				_rotate_bytes=$((_rotate_opt))
+				;;
+			esac
+			;;
+		esac
+	fi
 
-    if [ "$_mode" = "overwrite" ]; then
-        : >"$_logfile" 2>/dev/null || true
-    fi
+	if [ "$_mode" = "overwrite" ]; then
+		: >"$_logfile" 2>/dev/null || true
+	fi
 
-    _maybe_rotate() {
-        if [ "${_rotate_bytes:-0}" -le 0 ]; then
-            return 0
-        fi
-        if [ -f "$_logfile" ]; then
-            _cur_size=$(wc -c <"$_logfile" 2>/dev/null || echo 0)
-            if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
-                _bak="${_logfile}.b"
-                rm -f "$_bak" 2>/dev/null || true
-                mv "$_logfile" "$_bak" 2>/dev/null || true
-                : >"$_logfile" 2>/dev/null || true
-            fi
-        fi
-    }
+	_maybe_rotate() {
+		if [ "${_rotate_bytes:-0}" -le 0 ]; then
+			return 0
+		fi
+		if [ -f "$_logfile" ]; then
+			_cur_size=$(wc -c <"$_logfile" 2>/dev/null || echo 0)
+			if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
+				_bak="${_logfile}.b"
+				rm -f "$_bak" 2>/dev/null || true
+				mv "$_logfile" "$_bak" 2>/dev/null || true
+				: >"$_logfile" 2>/dev/null || true
+			fi
+		fi
+	}
 
-    _write_line() {
-        _line="$1"
-        _clean=$(printf '%s' "$_line" | tr -d '\033' | sed 's/\[[0-9;]*m//g')
-        _maybe_rotate
-        printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >>"$_logfile"
-    }
+	_write_line() {
+		_line="$1"
+		_clean=$(printf '%s' "$_line" | tr -d '\033' | sed 's/\[[0-9;]*m//g')
+		_maybe_rotate
+		printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >>"$_logfile"
+	}
 
-    if [ $# -gt 0 ]; then
-        _msg="$*"
-        _write_line "$_msg"
-    else
-        if [ -t 0 ]; then
-            : # no piped stdin
-        else
-            while IFS= read -r _ln || [ -n "$_ln" ]; do
-                _write_line "$_ln"
-            done
-        fi
-    fi
+	if [ $# -gt 0 ]; then
+		_msg="$*"
+		_write_line "$_msg"
+	else
+		if [ -t 0 ]; then
+			: # no piped stdin
+		else
+			while IFS= read -r _ln || [ -n "$_ln" ]; do
+				_write_line "$_ln"
+			done
+		fi
+	fi
 
-    unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
+	unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
 }
