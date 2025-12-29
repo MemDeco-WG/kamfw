@@ -24,25 +24,25 @@ mihomo_get_ui_redirect() {
 # Usage: mihomo_set_ui_redirect <url> [index_file]
 # Returns 0 on success.
 mihomo_set_ui_redirect() {
-    _url="$1"
-    _index="${2:-${MODDIR:-${0%/*}}/webroot/index.html}"
-    if [ -z "$_url" ]; then
-        error "Usage: mihomo_set_ui_redirect <url> [index_file]"
-        return 2
-    fi
-    if [ ! -f "$_index" ]; then
-        error "Index file not found: $_index"
-        return 3
-    fi
-    if ! grep -q "document.location" "$_index"; then
-        error "No document.location found in $_index"
-        return 4
-    fi
-    # Escape potential sed metacharacters in the URL
-    _url_escaped=$(printf '%s' "$_url" | sed 's/[&]/\\&/g')
+	_url="$1"
+	_index="${2:-${MODDIR:-${0%/*}}/webroot/index.html}"
+	if [ -z "$_url" ]; then
+		error "Usage: mihomo_set_ui_redirect <url> [index_file]"
+		return 2
+	fi
+	if [ ! -f "$_index" ]; then
+		error "Index file not found: $_index"
+		return 3
+	fi
+	if ! grep -q "document.location" "$_index"; then
+		error "No document.location found in $_index"
+		return 4
+	fi
+	# Escape potential sed metacharacters in the URL
+	_url_escaped=$(printf '%s' "$_url" | sed 's/[&]/\\&/g')
 
-    # Simple replacement (no backup, minimal complexity)
-    if sed "s|\(document.location[[:space:]]*=[[:space:]]*\)['\"][^'\"]*['\"]|\1'${_url_escaped}'|" "$_index" > "${_index}.new"; then
+	# Simple replacement (no backup, minimal complexity)
+	if sed "s|\(document.location[[:space:]]*=[[:space:]]*\)['\"][^'\"]*['\"]|\1'${_url_escaped}'|" "$_index" >"${_index}.new"; then
     if mv -f -- "${_index}.new" "$_index"; then
         success "$(i18n 'WEBROOT_REDIRECT_UPDATED' 2>/dev/null || echo 'Webroot redirect updated to: ')$_url"
         return 0
@@ -58,33 +58,32 @@ else
 fi
 }
 
-set_default (){
+set_default() {
 _url="http://127.0.0.1:9090/ui/cubex"
 mihomo_set_ui_redirect "$_url"
 unset _url
 }
-set_yacd (){
+set_yacd() {
 _url="https://yacd.metacubex.one/"
 mihomo_set_ui_redirect "$_url"
 unset _url
 }
 
-set_i18n "SET_UI_REDIRECT"  \
+set_i18n "SET_UI_REDIRECT" \
 "zh" "设置 WebUI 跳转" \
 "en" "Set WebUI redirect" \
 "ja" "WebUI リダイレクト設定" \
 "ko" "WebUI 리디렉션 설정"
-set_i18n "USE_DEFAULT"      \
-"zh" "使用本地默认"   \
-"en" "Use local default"      \
+set_i18n "USE_DEFAULT" \
+"zh" "使用本地默认" \
+"en" "Use local default" \
 "ja" "ローカルのデフォルトを使用" \
 "ko" "로컬 기본 사용"
-set_i18n "USE_YACD"  \
-"zh" "使用 Yacd 前端"  \
-"en" "Use Yacd frontend"      \
-"ja" "Yacd フロントエンドを使用"     \
+set_i18n "USE_YACD" \
+"zh" "使用 Yacd 前端" \
+"en" "Use Yacd frontend" \
+"ja" "Yacd フロントエンドを使用" \
 "ko" "Yacd 프론트엔드 사용"
-
 
 ask_webui() {
 # Ask the user to choose between using the local default UI or the Yacd frontend.
@@ -102,7 +101,7 @@ ask "SET_UI_REDIRECT" \
 is_mihomo_running() {
 # Check if MiHoMo is running.
 # Returns 0 if MiHoMo is running, 1 otherwise.
-if pgrep -f "mihomo" > /dev/null; then
+if pgrep -f "mihomo" >/dev/null; then
     config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'RUNNING')"
     return 0
 else
@@ -179,7 +178,6 @@ set_i18n "NOT_RUNNING" \
 "en" "Not running" \
 "ja" "実行していません" \
 "ko" "실行 중 아님"
-
 
 ask_toggle_mihomo() {
 # Ask the user to toggle MiHoMo.

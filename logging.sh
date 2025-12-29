@@ -38,22 +38,22 @@ set_i18n "LOGLEVEL_SET" \
 # Normalize a user-provided level to canonical name
 __kam_log_level_normalize() {
     case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
-        0|ERROR|ERR) printf '%s' "ERROR" ;;
-        1|WARN|WARNING) printf '%s' "WARN" ;;
-        3|DEBUG|DBG) printf '%s' "DEBUG" ;;
-        2|INFO) printf '%s' "INFO" ;;
-        *) printf '%s' "INFO" ;; # default
+    0 | ERROR | ERR) printf '%s' "ERROR" ;;
+    1 | WARN | WARNING) printf '%s' "WARN" ;;
+    3 | DEBUG | DBG) printf '%s' "DEBUG" ;;
+    2 | INFO) printf '%s' "INFO" ;;
+    *) printf '%s' "INFO" ;; # default
     esac
 }
 
 # Map canonical name to numeric level: ERROR=0, WARN=1, INFO=2, DEBUG=3
 __kam_log_level_value() {
     case "$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')" in
-        ERROR) printf '%s' 0 ;;
-        WARN)  printf '%s' 1 ;;
-        INFO)  printf '%s' 2 ;;
-        DEBUG) printf '%s' 3 ;;
-        *) printf '%s' 2 ;; # default INFO
+    ERROR) printf '%s' 0 ;;
+    WARN) printf '%s' 1 ;;
+    INFO) printf '%s' 2 ;;
+    DEBUG) printf '%s' 3 ;;
+    *) printf '%s' 2 ;; # default INFO
     esac
 }
 
@@ -153,10 +153,19 @@ log() {
 
     while [ $# -gt 0 ]; do
         case "$1" in
-            -w|--overwrite) _mode="overwrite"; shift ;;
-            -f|--file) _logfile="$2"; shift 2 ;;
-            -r|--rotate|--rotate-size) _rotate_opt="$2"; shift 2 ;;
-            *) break ;;
+        -w | --overwrite)
+            _mode="overwrite"
+            shift
+            ;;
+        -f | --file)
+            _logfile="$2"
+            shift 2
+            ;;
+        -r | --rotate | --rotate-size)
+            _rotate_opt="$2"
+            shift 2
+            ;;
+        *) break ;;
         esac
     done
 
@@ -166,51 +175,90 @@ log() {
 
     if [ -n "${_rotate_opt:-}" ]; then
         case "${_rotate_opt}" in
-    *[kK]) _num="${_rotate_opt%[kK]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1024)) ;; esac ;;
-*[mM]) _num="${_rotate_opt%[mM]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1048576)) ;; esac ;;
-*[gG]) _num="${_rotate_opt%[gG]}"; case "${_num}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_num * 1073741824)) ;; esac ;;
-*) case "${_rotate_opt}" in ''|*[!0-9]*) _rotate_bytes=0 ;; *) _rotate_bytes=$((_rotate_opt)) ;; esac ;;
-esac
-fi
+        *[kK])
+            _num="${_rotate_opt%[kK]}"
+            case "${_num}" in
+            '' | *[!0-9]*)
+                _rotate_bytes=0
+                ;;
+            *)
+                _rotate_bytes=$((_num * 1024))
+                ;;
+            esac
+            ;;
+        *[mM])
+            _num="${_rotate_opt%[mM]}"
+            case "${_num}" in
+            '' | *[!0-9]*)
+                _rotate_bytes=0
+                ;;
+            *)
+                _rotate_bytes=$((_num * 1048576))
+                ;;
+            esac
+            ;;
+        *[gG])
+            _num="${_rotate_opt%[gG]}"
+            case "${_num}" in
+            '' | *[!0-9]*)
+                _rotate_bytes=0
+                ;;
+            *)
+                _rotate_bytes=$((_num * 1073741824))
+                ;;
+            esac
+            ;;
+        *)
+            case "${_rotate_opt}" in
+            '' | *[!0-9]*)
+                _rotate_bytes=0
+                ;;
+            *)
+                _rotate_bytes=$((_rotate_opt))
+                ;;
+            esac
+            ;;
+        esac
+    fi
 
-if [ "$_mode" = "overwrite" ]; then
-: > "$_logfile" 2>/dev/null || true
-fi
+    if [ "$_mode" = "overwrite" ]; then
+        : >"$_logfile" 2>/dev/null || true
+    fi
 
-_maybe_rotate() {
-if [ "${_rotate_bytes:-0}" -le 0 ]; then
-return 0
-fi
-if [ -f "$_logfile" ]; then
-_cur_size=$(wc -c < "$_logfile" 2>/dev/null || echo 0)
-if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
-_bak="${_logfile}.b"
-rm -f "$_bak" 2>/dev/null || true
-mv "$_logfile" "$_bak" 2>/dev/null || true
-: > "$_logfile" 2>/dev/null || true
-fi
-fi
-}
+    _maybe_rotate() {
+        if [ "${_rotate_bytes:-0}" -le 0 ]; then
+            return 0
+        fi
+        if [ -f "$_logfile" ]; then
+            _cur_size=$(wc -c <"$_logfile" 2>/dev/null || echo 0)
+            if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
+                _bak="${_logfile}.b"
+                rm -f "$_bak" 2>/dev/null || true
+                mv "$_logfile" "$_bak" 2>/dev/null || true
+                : >"$_logfile" 2>/dev/null || true
+            fi
+        fi
+    }
 
-_write_line() {
-_line="$1"
-_clean=$(printf '%s' "$_line" | tr -d '\033' | sed 's/\[[0-9;]*m//g')
-_maybe_rotate
-printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >> "$_logfile"
-}
+    _write_line() {
+        _line="$1"
+        _clean=$(printf '%s' "$_line" | tr -d '\033' | sed 's/\[[0-9;]*m//g')
+        _maybe_rotate
+        printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$_clean" >>"$_logfile"
+    }
 
-if [ $# -gt 0 ]; then
-_msg="$*"
-_write_line "$_msg"
-else
-if [ -t 0 ]; then
-: # no piped stdin
-else
-while IFS= read -r _ln || [ -n "$_ln" ]; do
-_write_line "$_ln"
-done
-fi
-fi
+    if [ $# -gt 0 ]; then
+        _msg="$*"
+        _write_line "$_msg"
+    else
+        if [ -t 0 ]; then
+            : # no piped stdin
+        else
+            while IFS= read -r _ln || [ -n "$_ln" ]; do
+                _write_line "$_ln"
+            done
+        fi
+    fi
 
-unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
+    unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
 }

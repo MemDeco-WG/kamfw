@@ -4,24 +4,24 @@
 #
 # 如果存在boot-completed.sh 文件
 if [ -f "${MODDIR}/boot-completed.sh" ]; then
-    # 重命名为service.sh
-    mv "${MODDIR}/boot-completed.sh" "${MODDIR}/service.sh"
+	# 重命名为service.sh
+	mv "${MODDIR}/boot-completed.sh" "${MODDIR}/service.sh"
 fi
 
 # rule-2
 #
 # 如果不存在META-INF/com/google/android/update-script 文件
 if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
-    # 写入 #MAGISK
-    echo "#MAGISK" > "${MODDIR}/META-INF/com/google/android/update-script"
+	# 写入 #MAGISK
+	echo "#MAGISK" >"${MODDIR}/META-INF/com/google/android/update-script"
 fi
 
 # rule-3
 #
 # 如果不存在META-INF/com/google/android/update-binary 文件
 if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
-    # 写入
-    cat <<EOF > "${MODDIR}/META-INF/com/google/android/update-binary"
+	# 写入
+	cat <<EOF >"${MODDIR}/META-INF/com/google/android/update-binary"
 #!/sbin/sh
 
 #################
@@ -59,10 +59,10 @@ fi
 
 # Magisk 管理器：安装模块的实现
 install_module() {
-    _im_zip="$1"
-    [ -f "$_im_zip" ] || return 1
+	_im_zip="$1"
+	[ -f "$_im_zip" ] || return 1
 
-    magisk --install-module "$_im_zip"
+	magisk --install-module "$_im_zip"
 
-    unset _im_zip
+	unset _im_zip
 }
