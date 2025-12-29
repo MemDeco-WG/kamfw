@@ -157,6 +157,49 @@ set_i18n "FORCE_UPDATE_FILE" \
     "ja" "ファイル \$_1 は既にインストールされています。強制的に更新しますか？" \
     "ko" "파일 \$_1 이 이미 설치되어 있습니다. 강제로 업데이트하시겠습니까？"
 
+# Install file dialog / messages used by confirm_install_file
+set_i18n "SELECT_INSTALL_FILE" \
+    "zh" "选择要安装的文件" \
+    "en" "Select file to install" \
+    "ja" "インストールするファイルを選択" \
+    "ko" "설치할 파일 선택"
+
+set_i18n "FILE_INSTALLED" \
+    "zh" "已安装: " \
+    "en" "Installed: " \
+    "ja" "インストール済: " \
+    "ko" "설치됨: "
+
+set_i18n "NO_FILES_AVAILABLE" \
+    "zh" "没有可安装的文件" \
+    "en" "No files available to install" \
+    "ja" "インストール可能なファイルがありません" \
+    "ko" "설치할 파일이 없습니다"
+
+set_i18n "CANCEL" \
+    "zh" "取消" \
+    "en" "Cancel" \
+    "ja" "キャンセル" \
+    "ko" "취소"
+
+set_i18n "IN_ZIP" \
+    "zh" "在压缩包中" \
+    "en" "in zip" \
+    "ja" "ZIP内" \
+    "ko" "zip 내"
+
+set_i18n "ZIPTOOLS_MISSING" \
+    "zh" "缺少 zip 工具（unzip/zipinfo），无法检查安装包内容，压缩内选项将不可用" \
+    "en" "zip utilities (unzip/zipinfo) not found; cannot inspect ZIPFILE (in-zip options unavailable)" \
+    "ja" "zip ユーティリティ（unzip/zipinfo）が見つかりません。ZIP の内容を検査できません（ZIP 内オプションは利用不可）" \
+    "ko" "zip 도구(unzip/zipinfo)를 찾을 수 없습니다. ZIP 파일을 검사할 수 없습니다(압축 내 옵션 사용 불가)"
+
+set_i18n "INSTALLED" \
+    "zh" "已安装" \
+    "en" "installed" \
+    "ja" "インストール済" \
+    "ko" "설치됨"
+
 # Language selection / labels
 set_i18n "SWITCH_LANGUAGE" \
     "zh" "选择语言" \
@@ -208,25 +251,30 @@ set_i18n "DEBUG_MODE" "zh" "是否开启调试模式？" "en" "Enable debug mode
 set_i18n "DEBUG_ON" "zh" "调试模式已开启" "en" "Debug mode enabled" "ja" "デバッグモードが有効です" "ko" "디버그 모드가 활성화되었습니다"
 
 # Template function for string substitution
-# Usage: echo "Hello " | t "World"
+# Usage: echo "Hello $_1" | t "World"
 t() {
-    _template=""
+    # If no piped stdin, fall back to printing the first argument (if any)
     if [ -t 0 ]; then
-        # If stdin is a terminal, use the argument as template
-        printf '%s' "$_template"
-    else
-        # If piped, read from stdin and substitute
-        while IFS= read -r _line || [ -n "$_line" ]; do
-            _result="$_line"
-            shift 1
-            _arg_num=1
-            while [ $# -gt 0 ]; do
-                _result=$(printf '%s' "$_result" | sed "s/\\\$_arg_num//g")
-                shift
-                _arg_num=$((_arg_num + 1))
-            done
-            printf '%s\n' "$_result"
-        done
+        if [ $# -gt 0 ]; then
+            printf '%s' "$1"
+        fi
+        return 0
     fi
-    unset _template _line _result _arg_num
+
+    # Read entire piped input
+    _template=$(cat -)
+
+    _idx=1
+    while [ $# -gt 0 ]; do
+        _arg="$1"
+        # Escape characters that may interfere with sed replacement
+        _esc=$(printf '%s' "$_arg" | sed -e 's/\\/\\\\/g' -e 's/&/\\\&/g' -e 's/|/\\|/g')
+        # Replace occurrences of $_<index> with the escaped argument
+        _template=$(printf '%s' "$_template" | sed "s|\\\$_${_idx}|${_esc}|g")
+        shift
+        _idx=$((_idx + 1))
+    done
+
+    printf '%s' "$_template"
+    unset _template _idx _arg _esc
 }

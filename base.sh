@@ -9,7 +9,6 @@ is_tty() {
         return 1
     fi
 }
-
 if is_tty; then
     export COL_RED='\033[0;31m'
     export COL_GRN='\033[0;32m'
@@ -32,54 +31,53 @@ else
     export ANSI_CLEAR_LINE=''
 fi
 
-info () {
-    printf '%b\n' "${COL_GRN}$1${COL_RST}"
-    # also write to module log (colors are stripped by log())
-    log "INFO: $1"
-}
-
 green () {
     printf '%b\n' "${COL_GRN}$1${COL_RST}"
 }
 
-error () {
-    printf '%b\n' "${COL_RED}$1${COL_RST}"
-    # also write to module log
-    log "ERROR: $1"
+info () {
+    green "INFO: $1"
+    # also write to module log (colors are stripped by log())
+    log "INFO: $1"
 }
 
 red() {
     printf '%b\n' "${COL_RED}$1${COL_RST}"
 }
 
-warn () {
-    printf '%b\n' "${COL_YLW}$1${COL_RST}"
+error () {
+    red "ERROR: $1"
     # also write to module log
-    log "WARN: $1"
+    log "ERROR: $1"
 }
 
 yellow() {
     printf '%b\n' "${COL_YLW}$1${COL_RST}"
 }
 
-success () {
-    printf '%b\n' "${COL_GRN}$1${COL_RST}"
+warn () {
+    yellow "WARN: $1"
     # also write to module log
-    log "SUCCESS: $1"
+    log "WARN: $1"
 }
 
-debug() {
-    if [ "${KAM_DEBUG:-0}" = "1" ]; then
-        printf '%b\n' "${COL_CYN}[DEBUG] $1${COL_RST}"
-        # only log debug messages when debug is enabled
-        log "[DEBUG] $1"
-    fi
+success () {
+    green "$1"
+    # also write to module log
+    log "SUCCESS: $1"
 }
 
 cyan() {
     printf '%b\n' "${COL_CYN}$1${COL_RST}"
 }
 
+debug() {
+    if [ "${KAM_DEBUG:-0}" = "1" ]; then
+        cyan "[DEBUG] $1"
+        # only log debug messages when debug is enabled
+        log "[DEBUG] $1"
+    fi
+}
 
 log() {
     # Set sensible defaults using parameter default assignment:
@@ -264,4 +262,3 @@ is_ap() {
     _ia_mgr=$(get_manager)
     [ "$_ia_mgr" = "ap" ]
 }
-
