@@ -8,7 +8,7 @@ is_ap && import ap
 
 ui_print() {
     print "$@"
-}1
+}
 
 require_module() {
     _module_id="$1"
@@ -47,21 +47,21 @@ module_exists() {
 
 # kam install
 # kam manager
-kam (){
+kam() {
     _kam_cmd="$1"
     shift
 
     case "$_kam_cmd" in
-        install)
-            install_module "$@"
-            ;;
-        manager)
-            get_manager
-            ;;
-        *)
-            error "Invalid command!"
-            return 1
-            ;;
+    install)
+        install_module "$@"
+        ;;
+    manager)
+        get_manager
+        ;;
+    *)
+        error "Invalid command!"
+        return 1
+        ;;
     esac
 
     unset _kam_cmd
