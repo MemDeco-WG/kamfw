@@ -1,7 +1,7 @@
 # shellcheck shell=ash
 import __termux__
 
-setup_termux_env
+active_termux_env
 
 export PATH="$MODDIR/.local/bin:$PATH"
 

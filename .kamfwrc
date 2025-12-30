@@ -28,34 +28,30 @@ fi
 # 基础函数
 # =============================================================================
 
+[ -t 1 ] && export IS_TTY=true ||export IS_TTY=false
+
 # terminal print (tty)
 tprint() {
-    [ -t 1 ] || return 0
-    printf '%s\n' "$@"
+    $IS_TTY && printf '%s\n' "$*"
 }
 
 # GUI print (not tty)
 gprint() {
-    [ -t 1 ] && return 0
-    printf '%s\n' "$@"
+    $IS_TTY || printf '%s\n' "$*"
 }
+
 # ui_print plus
 print() {
-     _print_msg="$1"
-     if [ "${BOOTMODE:-true}" = true ]; then
-         tprint "$_print_msg"
-         gprint "$_print_msg"
-     else
-         if [ -n "${OUTFD:-}" ] && [ -e "/proc/self/fd/$OUTFD" ]; then
-             printf 'ui_print %s\nui_print\n' "$_print_msg" >&"$OUTFD"
-         fi
-     fi
+    if [ "${BOOTMODE:-true}" = "true" ]; then
+        printf '%s\n' "$1"
+    elif [ -e "/proc/self/fd/${OUTFD:-}" ]; then
+        printf 'ui_print %s\nui_print\n' "$1" >&"$OUTFD"
+    fi
 }
 
 has_command() {
-    type "$1" >/dev/null 2>&1
+    command -v "$1" >/dev/null 2>&1
 }
-
 
 # 换行符变量
 NL='
@@ -132,8 +128,8 @@ import() { kamfw load "$@"; }
 # =============================================================================
 
 import base
-import i18n
 import logging
+import i18n
 import kam
 
 ui_print() {
