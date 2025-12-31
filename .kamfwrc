@@ -7,18 +7,17 @@
 ##########################################################################################
 
 export MODDIR=${MODPATH:-${1:-${0%/*}}}
-# 环境变量
-export HOME=${MODDIR}
-export KAMFW_DIR=${MODDIR}/lib/kamfw
-export KAM_MODULES=${KAM_MODULES:-""}
-export KAM_LOGFILE=${MODDIR}/kam.log
-
-# Load persisted language override (if present).
-# This file is written by the `select_language` helper (created below).
-# When present it will export `KAM_LANG` so the i18n system picks it up.
-if [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
-    . "${KAMFW_DIR}/.kamfw_lang"
+. "${MODDIR}/.config/kamfw/.envrc"
+if [ -d "${MODDIR}/.config/kamfw/env.d" ]; then
+    for _kamfw_rcfile in "${MODDIR}/.config/kamfw/env.d/"*.envrc; do
+        [ -r "$_kamfw_rcfile" ] || continue
+        . "$_kamfw_rcfile"
+    done
 fi
+
+# NOTE: persisted language override is intentionally NOT sourced here.
+# The `lang` helper (lib/kamfw/lang.sh) will source `${KAMFW_DIR}/.kamfw_lang`
+# when necessary (so that loading environment files has a single, well-defined place).
 # =============================================================================
 # 实验区域
 # =============================================================================

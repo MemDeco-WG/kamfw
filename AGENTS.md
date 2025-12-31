@@ -27,7 +27,8 @@ at-exit（退出）钩子
   - `at_exit_add '<cmd_or_fn>'`：注册 handler（唯一、按添加顺序执行）。
   - `at_exit_remove '<cmd>'`、`at_exit_list`、`at_exit_clear`：管理 handlers。
   - `at_exit_register_trap` / `at_exit_unregister_trap`：注册/注销 EXIT trap（idempotent）。
-  - 内置安装处理器：`__at_exit_install_from_filters`（可通过 `at_exit_add '__at_exit_install_from_filters'` 添加；当 `MODPATH` 存在时在加载时自动添加以保持旧行为）。
+  - 安装（install-on-exit）逻辑由安装器模块提供（参见 `__installer_install_from_filters`）。要在退出时安装文件，请使用 `installer schedule`（会显式注册处理器），或在需要时显式调用 `at_exit_add '__installer_install_from_filters'` 来注册处理器。
+  - 注册 trap 时尽量捕获并在处理完自己的 handlers 后调用之前的 trap（best-effort）。
 - 注册 trap 时尽量捕获并在处理完自己的 handlers 后调用之前的 trap（best-effort）以兼容其他脚本的退出钩子。
 - handlers 在退出时可在子 shell 中执行以隔离环境（实现中为子 shell 执行 `eval`，并忽略单个 handler 的错误）。
 
@@ -55,8 +56,8 @@ at-exit（退出）钩子
 快速验证示例
 - at-exit handler（安装场景）验证：
   1. 准备：创建临时 `KAM_MODULE_ROOT`（含 `bin/foo`），设置 `MODPATH` 到临时目标目录，且把 `lib/kamfw` 复制到 `$MODPATH/lib/kamfw`（模拟安装时的文件布局）。
-  2. 在 shell 中 `. "$MODPATH/lib/kamfw/.kamfwrc" && import __customize__`，然后调用 `install_reset_filters; install_include "bin/*"`，退出 shell（`exit`）；检查 `$MODPATH/bin/foo` 已被安装。
-- 日志级别验证：
+  2. 在 shell 中 `. "$MODPATH/lib/kamfw/.kamfwrc" && import __customize__`，然后调用 `install_reset_filters; install_include "bin/*"; install_register_exit_hook`（显式注册退出安装钩子），退出 shell（`exit`）；检查 `$MODPATH/bin/foo` 已被安装。
+  3. 日志级别验证：
   1. `export KAM_LOGLEVEL=ERROR`；运行 `info "hi"`（不应在屏幕显示）；运行 `error "oops"`（应显示并写入日志）。
   2. `export KAM_LOGLEVEL=DEBUG` 或 `export KAM_DEBUG=1`；运行 `debug "d"`（应显示并写入日志）。
 - `install_check` 验证：
