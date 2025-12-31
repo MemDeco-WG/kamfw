@@ -9,9 +9,7 @@
 #   unset_kam_language     # remove override (back to system / auto)
 #
 # Notes:
-# - Persists choice to "${KAMFW_DIR}/.kamfw_ui_language" as `export KAM_UI_LANGUAGE="..."`.
-# - Legacy support: older "${KAMFW_DIR}/.kamfw_lang" (exporting `KAM_LANG`) is still read for compatibility,
-#   but `KAM_LANG` is deprecated and will be removed in a future release.
+# - Persists choice to "${KAM_LANG_FILE}" as `export KAM_LANG="..."`.
 # - Tries to set system property `persist.sys.locale` via `resetprop -w` or
 #   `setprop` when available (best-effort).
 # - Uses the existing `i18n` + `ask` helpers for localized menu and input.
@@ -19,29 +17,23 @@
 
 # Ensure we have a sane default for KAMFW_DIR when sourced standalone.
 : "${KAMFW_DIR:=${MODDIR:-${0%/*}}/lib/kamfw}"
-: "${KAM_UI_LANGUAGE_FILE:=${KAMFW_DIR}/.kamfw_ui_language}"
+: "${KAM_LANG_FILE:=${KAMFW_DIR}/.kamfw_lang}"
 
 # helper: return normalized current language (zh|en|ja|ko|auto)
 _lang_current() {
-    # If a persisted override exists, source it to obtain the explicit override.
-    # Prefer the modern override file/variable, but fall back to legacy for compatibility.
-    if [ -z "${KAM_UI_LANGUAGE:-}" ] && [ -f "${KAMFW_DIR}/.kamfw_ui_language" ]; then
+    # If a persisted override exists, source it to obtain the explicit override
+    if [ -z "${KAM_LANG:-}" ] && [ -f "${KAM_LANG_FILE}" ]; then
         # shellcheck disable=SC1090
-        . "${KAMFW_DIR}/.kamfw_ui_language" 2>/dev/null || true
-    elif [ -z "${KAM_UI_LANGUAGE:-}" ] && [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
-        # Legacy persisted file detected; source for backward-compatibility.
-        . "${KAMFW_DIR}/.kamfw_lang" 2>/dev/null || true
-        [ "${KAM_DEBUG_I18N:-}" = "1" ] && print "Warning: KAM_LANG is deprecated; please migrate to KAM_UI_LANGUAGE"
+        . "${KAM_LANG_FILE}" 2>/dev/null || true
     fi
 
     # If user explicitly selected 'auto', return 'auto' so callers can treat it specially
-    if [ "${KAM_UI_LANGUAGE:-}" = "auto" ] || [ "${KAM_LANG:-}" = "auto" ]; then
+    if [ "${KAM_LANG:-}" = "auto" ]; then
         printf 'auto'
         return 0
     fi
 
-    # Use KAM_UI_LANGUAGE if set, otherwise fall back to legacy KAM_LANG or system locale.
-    _l="${KAM_UI_LANGUAGE:-${KAM_LANG:-$(getprop persist.sys.locale 2>/dev/null | cut -d'-' -f1)}}"
+    _l="${KAM_LANG:-$(getprop persist.sys.locale 2>/dev/null | cut -d'-' -f1)}"
     _l="${_l:-en}"
     case "$_l" in
     zh* | cn* | CN*) printf 'zh' ;;
@@ -57,16 +49,12 @@ _lang_persist() {
     mkdir -p "${KAMFW_DIR}" 2>/dev/null || true
 
     if [ -z "$_lang" ] || [ "$_lang" = "auto" ]; then
-        [ -f "${KAMFW_DIR}/.kamfw_ui_language" ] && rm -f "${KAMFW_DIR}/.kamfw_ui_language" 2>/dev/null || true
-        # Also remove legacy file for clean migration
-        [ -f "${KAMFW_DIR}/.kamfw_lang" ] && rm -f "${KAMFW_DIR}/.kamfw_lang" 2>/dev/null || true
-        unset KAM_UI_LANGUAGE
+        [ -f "${KAM_LANG_FILE}" ] && rm -f "${KAM_LANG_FILE}" 2>/dev/null || true
         unset KAM_LANG
         return 0
     fi
 
-    # Persist using the new, explicit filename and variable
-    printf 'export KAM_UI_LANGUAGE="%s"\n' "$_lang" >"${KAMFW_DIR}/.kamfw_ui_language"
+    printf 'export KAM_LANG="%s"\n' "$_lang" >"${KAM_LANG_FILE}"
 }
 
 # Best-effort setprop/resetprop for system locale
@@ -92,8 +80,7 @@ set_lang() {
         return $?
     fi
 
-    # Set the modern variable so immediate sessions obey the selection.
-    export KAM_UI_LANGUAGE="$_lang"
+    export KAM_LANG="$_lang"
 
     if _lang_persist "$_lang"; then
         _lang_setprop "$_lang"
@@ -120,7 +107,7 @@ select_lang() {
     _test_i18n=$(i18n "SWITCH_LANGUAGE" 2>/dev/null)
     [ -z "$_test_i18n" ] && {
         # Fallback to English if i18n is not working
-        export KAM_UI_LANGUAGE="en"
+        export KAM_LANG="en"
     }
 
     # Determine current normalized language (may return 'auto')
@@ -175,10 +162,4 @@ select_lang() {
     fi
 
     ask "$@" "$_default"
-}
-
-# Backward-compatibility: older modules expect `select_language` to exist
-# Provide a small wrapper to preserve the previous API.
-select_language() {
-    select_lang "$@"
 }
