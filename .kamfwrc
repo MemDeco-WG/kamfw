@@ -15,9 +15,17 @@ export KAM_LOGFILE=${MODDIR}/kam.log
 
 # Load persisted language override (if present).
 # This file is written by the `select_language` helper (created below).
-# When present it will export `KAM_LANG` so the i18n system picks it up.
-if [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
+# When present it will export `KAM_UI_LANGUAGE` so the i18n system picks it up.
+# For backwards compatibility we also support the legacy `.kamfw_lang` file;
+# when that legacy file is detected and KAM_DEBUG_I18N=1 we print a deprecation warning.
+if [ -f "${KAMFW_DIR}/.kamfw_ui_language" ]; then
+    . "${KAMFW_DIR}/.kamfw_ui_language"
+elif [ -f "${KAMFW_DIR}/.kamfw_lang" ]; then
+    # Legacy persisted file detected; source for compatibility.
     . "${KAMFW_DIR}/.kamfw_lang"
+    if [ "${KAM_DEBUG_I18N:-}" = "1" ]; then
+        print "Warning: KAM_LANG is deprecated. Please migrate to KAM_UI_LANGUAGE."
+    fi
 fi
 # =============================================================================
 # 实验区域
