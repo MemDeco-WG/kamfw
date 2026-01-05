@@ -39,13 +39,13 @@ installer() {
         cnt="$(__inst__count_lines "$files")"
 
         [ "$cnt" -eq 0 ] && {
-            info "$(i18n 'INSTALL_NO_FILES' 2>/dev/null || echo 'No files to install')"
+            _msg="$(i18n 'INSTALL_NO_FILES' 2>/dev/null)"; [ -n "$_msg" ] || _msg="No files to install"; info "$_msg"
             return 0
         }
 
         info "$(i18n 'INSTALL_RUNNING_NOW' 2>/dev/null | t "$cnt" 2>/dev/null || printf 'Installing %s files now' "$cnt")"
         __inst__invoke_install "$src"
-        info "$(i18n 'INSTALL_DONE' 2>/dev/null || echo 'Install completed')"
+        _msg="$(i18n 'INSTALL_DONE' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Install completed"; info "$_msg"
         return 0
         ;;
     schedule)

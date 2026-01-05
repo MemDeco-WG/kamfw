@@ -1,14 +1,18 @@
 # shellcheck shell=ash
 
+# KAM_HOME env exports + directory init
+# env.sh provides KAM_* exports and the kamfw() wrapper.
+# init_dirs.sh creates required directories under $KAM_HOME.
+import env
+import init_dirs
+kam_init_dirs
+
 is_magisk && import magisk
 
 is_ksu && import ksu
 
 is_ap && import ap
 
-ui_print() {
-    print "$@"
-}
 
 require_module() {
     _module_id="$1"
@@ -59,8 +63,9 @@ kam() {
         get_manager
         ;;
     *)
-        error "Invalid command!"
-        return 1
+        # Default to kamfw wrapper for any other command
+        kamfw "$_kam_cmd" "$@"
+        return $?
         ;;
     esac
 

@@ -313,14 +313,14 @@ __confirm_install_file_do() {
         _final_title="$(i18n 'FORCE_UPDATE_FILE' 2>/dev/null | t "$_rel")"
         if confirm "$_final_title" 1; then
             cp -a "$_src" "$_dst"
-            success "$(i18n 'FILE_INSTALLED' 2>/dev/null || echo 'Installed: ')$_rel"
+            success "$({ _m="$(i18n 'FILE_INSTALLED' 2>/dev/null)"; [ -n "$_m" ] || _m='Installed: '; printf '%s' "$_m"; })$_rel"
             __confirm_install_file_installed="$_rel"
         else
             __confirm_install_file_cancel=1
         fi
     else
         cp -a "$_src" "$_dst"
-        success "$(i18n 'FILE_INSTALLED' 2>/dev/null || echo 'Installed: ')$_rel"
+        success "$({ _m="$(i18n 'FILE_INSTALLED' 2>/dev/null)"; [ -n "$_m" ] || _m='Installed: '; printf '%s' "$_m"; })$_rel"
         __confirm_install_file_installed="$_rel"
     fi
 
@@ -342,7 +342,7 @@ confirm_install_file() {
 
     # 如果 ZIPFILE 存在（可能因为 SKIPUNZIP=1），但系统缺少 unzip（基础工具），直接中止安装
     if [ -n "${ZIPFILE:-}" ] && [ -f "${ZIPFILE:-}" ] && ! command -v unzip >/dev/null 2>&1; then
-        abort "$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null || echo 'Required unzip utility not found; aborting installation.')"
+        _msg="$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Required unzip utility not found; aborting installation."; abort "$_msg"
     fi
 
     # 构建选项对 (text,cmd) - POSIX-safe (avoid bash arrays)
@@ -365,7 +365,7 @@ confirm_install_file() {
 
         if [ -n "$_cmd" ]; then
             if [ -f "$MODPATH/$_rel" ]; then
-                _label="$_rel ($(i18n 'INSTALLED' 2>/dev/null || echo 'installed'))"
+                _label="$_rel ($({ _m="$(i18n 'INSTALLED' 2>/dev/null)"; [ -n "$_m" ] || _m='installed'; printf '%s' "$_m"; }))"
             else
                 if [ -f "$_src" ]; then
                     _label="$_rel"
@@ -502,14 +502,14 @@ __confirm_install_file_do_from_zip() {
         _final_title="$(i18n 'FORCE_UPDATE_FILE' 2>/dev/null | t "$rel")"
         if confirm "$_final_title" 1; then
             cp -a "$srcfile" "$dst"
-            success "$(i18n 'FILE_INSTALLED' 2>/dev/null || echo 'Installed: ')$rel"
+            success "$({ _m="$(i18n 'FILE_INSTALLED' 2>/dev/null)"; [ -n "$_m" ] || _m='Installed: '; printf '%s' "$_m"; })$rel"
             __confirm_install_file_installed="$rel"
         else
             __confirm_install_file_cancel=1
         fi
     else
         cp -a "$srcfile" "$dst"
-        success "$(i18n 'FILE_INSTALLED' 2>/dev/null || echo 'Installed: ')$rel"
+        success "$({ _m="$(i18n 'FILE_INSTALLED' 2>/dev/null)"; [ -n "$_m" ] || _m='Installed: '; printf '%s' "$_m"; })$rel"
         __confirm_install_file_installed="$rel"
     fi
 

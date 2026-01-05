@@ -6,7 +6,9 @@ config() {
 
 	# 1. KernelSU Delegate
 	if is_ksu; then
-		_ksud=$(command -v ksud || echo "/data/adb/ksud")
+		# 非关键路径：ksud 可在不同位置；此处回退为固定路径，不允许用 `|| echo` 输出旁路。
+		_ksud=$(command -v ksud 2>/dev/null)
+		[ -n "${_ksud:-}" ] || _ksud="/data/adb/ksud"
 		[ -n "$KSU_MODULE" ] || [ ! -f "$MODDIR/module.prop" ] || export KSU_MODULE=$(sed -n 's/^id=//p' "$MODDIR/module.prop")
 		"$_ksud" module config "$_cmd" "$@"
 		return $?

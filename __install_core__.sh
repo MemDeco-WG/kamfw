@@ -123,7 +123,7 @@ __list_files_from_zip() {
         return 0
     fi
     # No suitable tool found
-    abort "$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null || echo 'zip tools missing')"
+    _msg="$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="zip tools missing"; abort "$_msg"
 }
 
 __install__get_files_from_zip() {
@@ -137,18 +137,18 @@ __install__get_files_from_zip() {
 __installer_install_from_filters() {
     # Only meaningful during an installation (MODPATH present)
     [ -z "${MODPATH:-}" ] && {
-        info "$(i18n 'AUTO_EXTRACT_NO_MODPATH' 2>/dev/null || echo 'No MODPATH set')"
+        _msg="$(i18n 'AUTO_EXTRACT_NO_MODPATH' 2>/dev/null)"; [ -n "$_msg" ] || _msg="No MODPATH set"; info "$_msg"
         return 0
     }
 
     # Determine files to install (caller provides context via install_check)
     files="$(install_check 2>/dev/null || true)"
     if [ -z "${files:-}" ]; then
-        info "$(i18n 'AUTO_EXTRACT_NO_FILES' 2>/dev/null || echo 'No files to install on exit')"
+        _msg="$(i18n 'AUTO_EXTRACT_NO_FILES' 2>/dev/null)"; [ -n "$_msg" ] || _msg="No files to install on exit"; info "$_msg"
         return 0
     fi
 
-    info "$(i18n 'AUTO_EXTRACT_START' 2>/dev/null || echo 'Starting install-on-exit...')"
+    _msg="$(i18n 'AUTO_EXTRACT_START' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Starting install-on-exit..."; info "$_msg"
 
     OLDIFS=$IFS
     IFS='
@@ -204,7 +204,7 @@ __installer_install_from_filters() {
                     # We require 'unzip' to perform extraction; fail fast otherwise
                     if ! command -v unzip >/dev/null 2>&1; then
                         rm -rf "$tmpdir" 2>/dev/null || true
-                        abort "$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null || echo 'zip tools missing')"
+                        _msg="$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="zip tools missing"; abort "$_msg"
                     fi
 
                     # Extract entry (preserve metadata as much as possible)

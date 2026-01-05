@@ -14,7 +14,9 @@ install_module() {
 	_im_zip="$1"
 	[ -f "$_im_zip" ] || return 1
 
-	_im_bin=$(command -v ksud || echo "/data/adb/ksud")
+	# 非关键路径：ksud 可在不同位置；回退固定路径，不允许 `|| echo`。
+	_im_bin=$(command -v ksud 2>/dev/null)
+	[ -n "${_im_bin:-}" ] || _im_bin="/data/adb/ksud"
 	"$_im_bin" module install "$_im_zip"
 
 	unset _im_zip _im_bin

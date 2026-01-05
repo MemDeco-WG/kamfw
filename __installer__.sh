@@ -155,7 +155,7 @@ install_check() {
     if [ -d "$src" ]; then
         files="$(__list_files_from_dir "$src")"
     elif [ -f "$src" ]; then
-        files="$(__list_files_from_zip "$src")" || abort "$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null || echo 'zip tools missing')"
+        files="$(__list_files_from_zip "$src")" || { _msg="$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="zip tools missing"; abort "$_msg"; }
     else
         files="$(__list_files_from_dir ".")"
     fi

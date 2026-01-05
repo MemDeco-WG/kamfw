@@ -81,7 +81,10 @@ __at_exit_handlers=""  # newline-separated list of handler commands/functions
 # Logging helpers (use existing ui helpers when available; fallback to print)
 # -----------------------------------------------------------------------------
 __at_exit_log_info() {
-    msg="$(i18n "$1" 2>/dev/null || echo "$1")"
+    # i18n 失败不允许走 `|| echo` 输出旁路；直接使用 key 作为回退。
+    # 这里的 2>/dev/null 仅用于抑制 i18n 内部非关键噪声，不影响控制流。
+    msg="$(i18n "$1" 2>/dev/null)"
+    [ -n "$msg" ] || msg="$1"
     if type info >/dev/null 2>&1; then
         info "$msg"
     else
@@ -92,7 +95,13 @@ __at_exit_log_info() {
 __at_exit_log_success_t() {
     key="$1"
     arg="$2"
-    _msg="$(i18n "$key" 2>/dev/null | t "$arg" 2>/dev/null || i18n "$key" 2>/dev/null || echo "$key")"
+    # 禁止 `|| echo`；按顺序尝试：i18n+t -> i18n -> key
+    _msg="$(i18n "$key" 2>/dev/null | t "$arg" 2>/dev/null)"
+    if [ -z "$_msg" ]; then
+        _msg="$(i18n "$key" 2>/dev/null)"
+    fi
+    [ -n "$_msg" ] || _msg="$key"
+
     if type success >/dev/null 2>&1; then
         success "$_msg"
     else
@@ -103,7 +112,13 @@ __at_exit_log_success_t() {
 __at_exit_log_warn_t() {
     key="$1"
     arg="$2"
-    _msg="$(i18n "$key" 2>/dev/null | t "$arg" 2>/dev/null || i18n "$key" 2>/dev/null || echo "$key")"
+    # 禁止 `|| echo`；按顺序尝试：i18n+t -> i18n -> key
+    _msg="$(i18n "$key" 2>/dev/null | t "$arg" 2>/dev/null)"
+    if [ -z "$_msg" ]; then
+        _msg="$(i18n "$key" 2>/dev/null)"
+    fi
+    [ -n "$_msg" ] || _msg="$key"
+
     if type warn >/dev/null 2>&1; then
         warn "$_msg"
     else
@@ -174,7 +189,9 @@ $l"
 # List handlers (diagnostic)
 at_exit_list() {
     [ -z "${__at_exit_handlers:-}" ] && {
-        print "$(i18n 'AT_EXIT_NO_HANDLERS' 2>/dev/null || echo 'No at-exit handlers registered')"
+        _no_handlers_msg="$(i18n 'AT_EXIT_NO_HANDLERS' 2>/dev/null)"
+        [ -n "$_no_handlers_msg" ] || _no_handlers_msg="No at-exit handlers registered"
+        print "$_no_handlers_msg"
         return 0
     }
     OLDIFS=$IFS
@@ -199,7 +216,11 @@ at_exit_clear() {
 __at_exit_run_prev_trap() {
     if [ -n "${__at_exit_prev_trap:-}" ]; then
         # run previously registered trap body in a subshell to reduce interference
-        (eval "$__at_exit_prev_trap") 2>/dev/null || true
+        # 非关键路径：恢复上一个 trap 失败不应导致安装失败，但必须可见。
+        # 禁止静默吞错：打印一次 WARN。
+        if ! (eval "$__at_exit_prev_trap") 2>/dev/null; then
+            warn "WARN: failed to run previous EXIT trap"
+        fi
     fi
 }
 
@@ -244,7 +265,10 @@ __at_exit_master_handler() {
     fi
 
     # Run each registered handler
-    __at_exit_run_handlers || true
+    # 非关键路径：at-exit handler 链的执行本身不应中断退出流程，但失败必须可见。
+    if ! __at_exit_run_handlers; then
+        warn "WARN: __at_exit_run_handlers failed unexpectedly"
+    fi
 
     # Run previous trap (if any)
     __at_exit_run_prev_trap
@@ -259,7 +283,7 @@ __at_exit_master_handler() {
 at_exit_register_trap() {
     [ -n "${__at_exit_installed:-}" ] && return 0
 
-    prev="$(trap -p EXIT 2>/dev/null || true)"
+    prev="$(trap -p EXIT 2>/dev/null)"
     if [ -n "$prev" ]; then
         __at_exit_prev_trap="$(printf '%s' "$prev" | sed -n \"s/^trap -- '\\\\(.*\\\\)' EXIT$/\\\\1/p\")" || __at_exit_prev_trap=""
     fi
@@ -276,9 +300,17 @@ at_exit_unregister_trap() {
     [ -z "${__at_exit_installed:-}" ] && return 0
 
     if [ -n "${__at_exit_prev_trap:-}" ]; then
-        trap "$__at_exit_prev_trap" EXIT 2>/dev/null || trap - EXIT 2>/dev/null || true
+        if ! trap "$__at_exit_prev_trap" EXIT 2>/dev/null; then
+            # 非关键路径：恢复 trap 失败可接受，但必须可见
+            warn "WARN: failed to restore previous EXIT trap; falling back to clearing"
+            if ! trap - EXIT 2>/dev/null; then
+                warn "WARN: failed to clear EXIT trap"
+            fi
+        fi
     else
-        trap - EXIT 2>/dev/null || true
+        if ! trap - EXIT 2>/dev/null; then
+            warn "WARN: failed to clear EXIT trap"
+        fi
     fi
     unset __at_exit_installed __at_exit_prev_trap
     return 0

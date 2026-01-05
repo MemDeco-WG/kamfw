@@ -44,16 +44,16 @@ mihomo_set_ui_redirect() {
 	# Simple replacement (no backup, minimal complexity)
 	if sed "s|\(document.location[[:space:]]*=[[:space:]]*\)['\"][^'\"]*['\"]|\1'${_url_escaped}'|" "$_index" >"${_index}.new"; then
 		if mv -f -- "${_index}.new" "$_index"; then
-			success "$(i18n 'WEBROOT_REDIRECT_UPDATED' 2>/dev/null || echo 'Webroot redirect updated to: ')$_url"
+			_msg="$(i18n 'WEBROOT_REDIRECT_UPDATED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Webroot redirect updated to: "; success "${_msg}${_url}"
 			return 0
 		else
 			rm -f -- "${_index}.new" 2>/dev/null || true
-			error "$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null || echo 'Failed to update webroot redirect')"
+			_msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Failed to update webroot redirect"; error "$_msg"
 			return 4
 		fi
 	else
 		rm -f -- "${_index}.new" 2>/dev/null || true
-		error "$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null || echo 'Failed to update webroot redirect')"
+		_msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Failed to update webroot redirect"; error "$_msg"
 		return 5
 	fi
 }

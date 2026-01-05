@@ -87,7 +87,7 @@ prune_zygisk_for_arch() {
 	fi
 
 	if ! command -v find >/dev/null 2>&1; then
-		abort "$(i18n 'PRUNE_ZYGISK_FIND_MISSING' 2>/dev/null || echo \"find not found\")"
+		_msg="$(i18n 'PRUNE_ZYGISK_FIND_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="find not found"; abort "$_msg"
 	fi
 
 	info "$(i18n 'PRUNE_ZYGISK_START' 2>/dev/null | t "$arch" "$zdir" 2>/dev/null || printf 'Pruning zygisk for arch %s in %s' "$arch" "$zdir")"

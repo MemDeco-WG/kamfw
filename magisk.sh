@@ -13,7 +13,7 @@ fi
 # 如果不存在META-INF/com/google/android/update-script 文件
 if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
 	# 写入 #MAGISK
-	echo "#MAGISK" >"${MODDIR}/META-INF/com/google/android/update-script"
+	printf '%s\n' "#MAGISK" >"${MODDIR}/META-INF/com/google/android/update-script"
 fi
 
 # rule-3
@@ -30,12 +30,13 @@ if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
 
 umask 022
 
-# echo before loading util_functions
-ui_print() { echo "$1"; }
+# NOTE: do not define ui_print here; util_functions.sh will provide it.
 require_new_magisk() {
-ui_print "*******************************"
-ui_print " Please install Magisk v20.4+! "
-ui_print "*******************************"
+# Fallback: before util_functions.sh is sourced, we may not have ui_print.
+# Must not use echo; use stderr.
+printf '%s\n' "*******************************" >&2
+printf '%s\n' " Please install Magisk v20.4+! " >&2
+printf '%s\n' "*******************************" >&2
 exit 1
 }
 
