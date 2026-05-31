@@ -17,7 +17,7 @@ kam_init_dirs() {
     return 1
   fi
 
-  # Must match .collab/00_index.md layout
+  # Keep runtime state under $KAM_ROOT.
   _kam_dirs="\
 $KAM_HOME/.config \
 $KAM_HOME/.local \

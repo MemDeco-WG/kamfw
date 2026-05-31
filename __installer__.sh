@@ -75,37 +75,6 @@ __inst__show_patterns() {
     IFS=$OLDIFS
 }
 
-# File listing utilities
-__list_files_from_dir() {
-    root="$1"
-    if [ -z "$root" ] || [ "$root" = "." ]; then
-        find . -type f 2>/dev/null | sed 's|^\./||'
-        return 0
-    fi
-    if [ -d "$root" ]; then
-        (cd "$root" 2>/dev/null && find . -type f 2>/dev/null | sed 's|^\./||')
-        return 0
-    fi
-    return 1
-}
-
-__list_files_from_zip() {
-    zipfile="$1"
-    if command -v zipinfo >/dev/null 2>&1; then
-        zipinfo -1 "$zipfile" 2>/dev/null | sed '/\/$/d'
-        return 0
-    fi
-    if command -v unzip >/dev/null 2>&1; then
-        if unzip -Z1 "$zipfile" >/dev/null 2>&1; then
-            unzip -Z1 "$zipfile" 2>/dev/null | sed '/\/$/d'
-            return 0
-        fi
-        unzip -l "$zipfile" 2>/dev/null | awk '{print $4}' | sed '/\/$/d' | sed '/^$/d'
-        return 0
-    fi
-    return 1
-}
-
 # Public API: filters
 install_reset_filters() {
     unset __install_exclude_patterns __install_include_patterns
@@ -155,7 +124,7 @@ install_check() {
     if [ -d "$src" ]; then
         files="$(__list_files_from_dir "$src")"
     elif [ -f "$src" ]; then
-        files="$(__list_files_from_zip "$src")" || { _msg="$(i18n 'ZIPTOOLS_MISSING' 2>/dev/null)"; [ -n "$_msg" ] || _msg="zip tools missing"; abort "$_msg"; }
+        files="$(__list_files_from_zip "$src")" || __inst__abort_ziptools_missing
     else
         files="$(__list_files_from_dir ".")"
     fi
@@ -187,4 +156,5 @@ install_check() {
     return 0
 }
 
-# CLI moved to __installer_cmd__.sh; import above to obtain the `installer()` command.
+# Keep `import __installer__` as the complete public installer entrypoint.
+import __installer_cmd__

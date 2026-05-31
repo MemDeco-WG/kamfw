@@ -1,9 +1,9 @@
 # shellcheck shell=ash
 
-# KAM_HOME env exports + directory init
-# env.sh provides KAM_* exports and the kamfw() wrapper.
+# KAM_HOME exports + directory init.
+# __runtime__.sh provides KAM_HOME/PATH helpers and the kamfw run dispatcher.
 # init_dirs.sh creates required directories under $KAM_HOME.
-import env
+import __runtime__
 import init_dirs
 kam_init_dirs
 

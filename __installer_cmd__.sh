@@ -14,7 +14,7 @@
 #
 installer() {
     cmd="$1"
-    shift || true
+    [ $# -gt 0 ] && shift
 
     case "$cmd" in
     exclude)
@@ -35,31 +35,31 @@ installer() {
         ;;
     run)
         src="$1"
-        files="$(install_check "$src" 2>/dev/null || true)"
+        files="$(install_check "$src" 2>/dev/null)"
         cnt="$(__inst__count_lines "$files")"
 
         [ "$cnt" -eq 0 ] && {
-            _msg="$(i18n 'INSTALL_NO_FILES' 2>/dev/null)"; [ -n "$_msg" ] || _msg="No files to install"; info "$_msg"
+            info "$(__inst__msg 'INSTALL_NO_FILES' 'No files to install')"
             return 0
         }
 
-        info "$(i18n 'INSTALL_RUNNING_NOW' 2>/dev/null | t "$cnt" 2>/dev/null || printf 'Installing %s files now' "$cnt")"
+        info "$(__inst__msg1 'INSTALL_RUNNING_NOW' "Installing $cnt files now" "$cnt")"
         __inst__invoke_install "$src"
-        _msg="$(i18n 'INSTALL_DONE' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Install completed"; info "$_msg"
+        info "$(__inst__msg 'INSTALL_DONE' 'Install completed')"
         return 0
         ;;
     schedule)
         src="$1"
-        files="$(install_check "$src" 2>/dev/null || true)"
+        files="$(install_check "$src" 2>/dev/null)"
         cnt="$(__inst__count_lines "$files")"
 
         [ "$cnt" -eq 0 ] && {
-            info "$(i18n 'INSTALL_NO_FILES' 2>/dev/null || echo 'No files to install')"
+            info "$(__inst__msg 'INSTALL_NO_FILES' 'No files to install')"
             return 0
         }
 
         __inst__register_hook
-        info "$(i18n 'INSTALL_WILL_ON_EXIT' 2>/dev/null | t "$cnt" 2>/dev/null || printf 'Will install %s files on exit' "$cnt")"
+        info "$(__inst__msg1 'INSTALL_WILL_ON_EXIT' "Will install $cnt files on exit" "$cnt")"
         return 0
         ;;
     "" | help | -h | --help)

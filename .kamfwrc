@@ -72,8 +72,10 @@ _kamfw_load () {
 
     if [ -f "$_kamfw_load_path" ]; then
         . "$_kamfw_load_path"
+        KAM_MODULES="${KAM_MODULES:-} ${_kamfw_load_name}"
     else
         print "Error: Module '$1' not found"
+        return 1
     fi
 }
 
@@ -118,17 +120,17 @@ kamfw() {
     esac
 }
 
-import() { kamfw load "$@"; }
+import() { _kamfw_load "$@"; }
 
-[ -t 0 ] && alias import='kamfw load'
+[ -t 0 ] && alias import='_kamfw_load'
 
 # =============================================================================
 # INIT
 # =============================================================================
 
+import i18n
 import base
 import logging
-import i18n
 import kam
 
 ui_print() {

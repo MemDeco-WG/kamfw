@@ -1,8 +1,9 @@
 # shellcheck shell=ash
 import app
-import env
 
-require_termux() { require_app "com.termux" "Termux Not Installed!" }
+require_termux() {
+    require_app "com.termux" "Termux Not Installed!"
+}
 
 set_termux_home() {
     export HOME="/data/data/com.termux/files/home"
