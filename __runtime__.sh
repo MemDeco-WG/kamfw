@@ -89,7 +89,7 @@ kamfw_run() {
     kamfw_init_termux
     kamfw_init_paths
 
-    # Phase 路由：优先调用 shell 侧实现（后续 rust CLI ready 后可改为优先 rust）
+    # Phase route: shell handlers are the runtime source of truth.
     case "$_phase" in
         install)
             import __install_core__
