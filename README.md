@@ -100,12 +100,12 @@ Useful local checks from the Kam repository root:
 
 ```sh
 shellcheck -S error -s sh \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/.kamfwrc" \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/__install_core__.sh" \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/__installer__.sh" \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/__installer_cmd__.sh" \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/kam.sh" \
-  "tmpl/kam_template/src/{{prop.id}}/lib/kamfw/__termux__.sh"
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/.kamfwrc" \
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/__install_core__.sh" \
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/__installer__.sh" \
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/__installer_cmd__.sh" \
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/kam.sh" \
+  "tmpl/kam_template/src/<module-id>/lib/kamfw/__termux__.sh"
 
 cargo run -- init /tmp/kam-smoke --tmpl --force
 ```
@@ -115,8 +115,8 @@ Minimal installer smoke test:
 ```sh
 tmp=$(mktemp -d /tmp/kamfw-test.XXXXXX)
 mkdir -p "$tmp/out/.config/kamfw" "$tmp/out/lib/kamfw" "$tmp/src/bin"
-cp tmpl/kam_template/src/{{prop.id}}/lib/kamfw/.kamfwrc "$tmp/out/lib/kamfw/.kamfwrc"
-cp tmpl/kam_template/src/{{prop.id}}/lib/kamfw/*.sh "$tmp/out/lib/kamfw/"
+cp tmpl/kam_template/src/<module-id>/lib/kamfw/.kamfwrc "$tmp/out/lib/kamfw/.kamfwrc"
+cp tmpl/kam_template/src/<module-id>/lib/kamfw/*.sh "$tmp/out/lib/kamfw/"
 printf 'KAMFW_DIR=%s\nKAM_MODULES=""\nKAM_HOME=%s\n' \
   "$tmp/out/lib/kamfw" "$tmp/home" > "$tmp/out/.config/kamfw/.envrc"
 printf '#!/bin/sh\necho ok\n' > "$tmp/src/bin/foo"

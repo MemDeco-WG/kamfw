@@ -73,7 +73,6 @@ set_i18n "AT_EXIT_HANDLER_FAILED" \
 # Internal state
 # -----------------------------------------------------------------------------
 __at_exit_installed="" # non-empty after trap registration
-__at_exit_prev_trap="" # previous EXIT trap body (best-effort capture)
 __at_exit_running=""   # guard to prevent re-entry
 __at_exit_handlers=""  # newline-separated list of handler commands/functions
 
@@ -211,20 +210,6 @@ at_exit_clear() {
 }
 
 # -----------------------------------------------------------------------------
-# Previous trap chaining (best-effort)
-# -----------------------------------------------------------------------------
-__at_exit_run_prev_trap() {
-    if [ -n "${__at_exit_prev_trap:-}" ]; then
-        # run previously registered trap body in a subshell to reduce interference
-        # 非关键路径：恢复上一个 trap 失败不应导致安装失败，但必须可见。
-        # 禁止静默吞错：打印一次 WARN。
-        if ! (eval "$__at_exit_prev_trap") 2>/dev/null; then
-            warn "WARN: failed to run previous EXIT trap"
-        fi
-    fi
-}
-
-# -----------------------------------------------------------------------------
 # Run registered handlers (executed in the trap context)
 # -----------------------------------------------------------------------------
 __at_exit_run_handlers() {
@@ -250,16 +235,15 @@ __at_exit_run_handlers() {
 }
 
 # -----------------------------------------------------------------------------
-# Master EXIT handler (chained with previous traps)
+# Master EXIT handler
 # -----------------------------------------------------------------------------
 __at_exit_master_handler() {
     [ -n "${__at_exit_running:-}" ] && return 0
     __at_exit_running=1
 
-    # If no handlers are registered, just run previous trap body (if any).
+    # If no handlers are registered, return without work.
     if [ -z "${__at_exit_handlers:-}" ]; then
         __at_exit_log_info "AT_EXIT_NO_HANDLERS"
-        __at_exit_run_prev_trap
         unset __at_exit_running
         return 0
     fi
@@ -270,9 +254,6 @@ __at_exit_master_handler() {
         warn "WARN: __at_exit_run_handlers failed unexpectedly"
     fi
 
-    # Run previous trap (if any)
-    __at_exit_run_prev_trap
-
     unset __at_exit_running
     return 0
 }
@@ -282,11 +263,6 @@ __at_exit_master_handler() {
 # -----------------------------------------------------------------------------
 at_exit_register_trap() {
     [ -n "${__at_exit_installed:-}" ] && return 0
-
-    prev="$(trap -p EXIT 2>/dev/null)"
-    if [ -n "$prev" ]; then
-        __at_exit_prev_trap="$(printf '%s' "$prev" | sed -n \"s/^trap -- '\\\\(.*\\\\)' EXIT$/\\\\1/p\")" || __at_exit_prev_trap=""
-    fi
 
     trap "__at_exit_master_handler" EXIT
     __at_exit_installed=1
@@ -299,20 +275,10 @@ at_exit_register_trap() {
 at_exit_unregister_trap() {
     [ -z "${__at_exit_installed:-}" ] && return 0
 
-    if [ -n "${__at_exit_prev_trap:-}" ]; then
-        if ! trap "$__at_exit_prev_trap" EXIT 2>/dev/null; then
-            # 非关键路径：恢复 trap 失败可接受，但必须可见
-            warn "WARN: failed to restore previous EXIT trap; falling back to clearing"
-            if ! trap - EXIT 2>/dev/null; then
-                warn "WARN: failed to clear EXIT trap"
-            fi
-        fi
-    else
-        if ! trap - EXIT 2>/dev/null; then
-            warn "WARN: failed to clear EXIT trap"
-        fi
+    if ! trap - EXIT 2>/dev/null; then
+        warn "WARN: failed to clear EXIT trap"
     fi
-    unset __at_exit_installed __at_exit_prev_trap
+    unset __at_exit_installed
     return 0
 }
 
