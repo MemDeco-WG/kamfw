@@ -98,16 +98,51 @@ ask_webui() {
 		0
 }
 
+mihomo_pids() {
+	if command -v pidof >/dev/null 2>&1; then
+		pidof mihomo 2>/dev/null && return 0
+	fi
+
+	pgrep -f '(^|/| )mihomo( |$)' 2>/dev/null
+}
+
+mihomo_set_status_description() {
+	if [ "$1" = "running" ]; then
+		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'RUNNING')"
+	else
+		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'NOT_RUNNING')"
+	fi
+}
+
 is_mihomo_running() {
 	# Check if MiHoMo is running.
 	# Returns 0 if MiHoMo is running, 1 otherwise.
-	if pgrep -f "mihomo" >/dev/null; then
-		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'RUNNING')"
+	if [ -n "$(mihomo_pids)" ]; then
+		mihomo_set_status_description running
 		return 0
 	else
-		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'NOT_RUNNING')"
+		mihomo_set_status_description stopped
 		return 1
 	fi
+}
+
+mihomo_protect_pid() {
+	_pid="$1"
+	[ -n "$_pid" ] || return 0
+
+	if [ -w "/proc/$_pid/oom_score_adj" ]; then
+		echo -1000 >"/proc/$_pid/oom_score_adj" 2>/dev/null || true
+	fi
+	if [ -w "/proc/$_pid/oom_adj" ]; then
+		echo -17 >"/proc/$_pid/oom_adj" 2>/dev/null || true
+	fi
+}
+
+mihomo_protect_running() {
+	for _pid in $(mihomo_pids); do
+		mihomo_protect_pid "$_pid"
+	done
+	unset _pid
 }
 
 mihomo_tun() {
@@ -128,21 +163,71 @@ mihomo_tun() {
 
 mihomo_start() {
 	if is_mihomo_running; then
-		return 1
-	else
-		mihomo_tun
-		mihomo &
-		is_mihomo_running
+		warn "mihomo is already running."
+		mihomo_protect_running
+		return 0
 	fi
+
+	mihomo_tun
+
+	_config="${MODDIR}/.config/mihomo/config.yaml"
+	_workdir="${MODDIR}/.config/mihomo"
+	_log="${MODDIR}/.log/mihomo.log"
+
+	if [ ! -f "$_config" ]; then
+		error "Config file not found: $_config"
+		mihomo_set_status_description stopped
+		return 1
+	fi
+
+	[ -d "${MODDIR}/.log" ] || mkdir -p "${MODDIR}/.log"
+
+	info "Starting mihomo..."
+	nohup mihomo -f "$_config" -d "$_workdir" >"$_log" 2>&1 &
+	_pid=$!
+	mihomo_protect_pid "$_pid"
+
+	sleep 1
+
+	if is_mihomo_running; then
+		mihomo_protect_running
+		success "mihomo started successfully."
+		return 0
+	fi
+
+	error "mihomo failed to start. Check $_log for details."
+	if [ -f "$_log" ]; then
+		print "--- Log tail ---"
+		tail -n 5 "$_log"
+		print "----------------"
+	fi
+	return 1
 }
 
 mihomo_stop() {
 	if is_mihomo_running; then
-		pkill -f "mihomo"
-		is_mihomo_running
-	else
-		return 1
+		info "Stopping mihomo..."
+		for _pid in $(mihomo_pids); do
+			kill "$_pid" 2>/dev/null || true
+		done
+		unset _pid
+		sleep 1
+		if is_mihomo_running; then
+			for _pid in $(mihomo_pids); do
+				kill -9 "$_pid" 2>/dev/null || true
+			done
+			unset _pid
+			sleep 1
+		fi
 	fi
+
+	if ! is_mihomo_running; then
+		success "mihomo stopped."
+		return 0
+	fi
+
+	error "Failed to stop mihomo."
+	return 1
 }
 
 toggle_mihomo() {
@@ -153,6 +238,7 @@ toggle_mihomo() {
 		info "Start and check"
 		mihomo_start
 	fi
+	is_mihomo_running >/dev/null 2>&1
 }
 
 set_i18n "TOGGLE_MIHOMO" \
