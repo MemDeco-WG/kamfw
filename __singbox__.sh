@@ -100,10 +100,18 @@ singbox_ask_webui() {
         0
 }
 
+singbox_pids() {
+    if command -v pidof >/dev/null 2>&1; then
+        pidof sing-box 2>/dev/null && return 0
+    fi
+
+    pgrep -f '(^|/| )sing-box( |$)' 2>/dev/null
+}
+
 is_singbox_running() {
     # Check if sing-box is running.
     # Returns 0 if sing-box is running, 1 otherwise.
-    if pgrep -f "sing-box" >/dev/null; then
+    if [ -n "$(singbox_pids)" ]; then
         config set override.description "$(i18n 'SINGBOX_STATUS'): $(i18n 'RUNNING')"
         return 0
     else
