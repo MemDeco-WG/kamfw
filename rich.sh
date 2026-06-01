@@ -95,6 +95,50 @@ guide() {
     printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
 }
 
+panel() {
+    _title="${1:-}"
+    newline
+    divider "━"
+    [ -n "$_title" ] && printf '%b\n' "${COL_CYN}${_title}${COL_RST}"
+    divider "─"
+    unset _title
+}
+
+panel_end() {
+    divider "━"
+}
+
+panel_row() {
+    _label="${1:-}"
+    _value="${2:-}"
+    printf '%b\n' "${COL_CYN}${_label}${COL_RST}  ${_value}"
+    unset _label _value
+}
+
+panel_note() {
+    _content="${1:-}"
+    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
+    unset _content
+}
+
+panel_success() {
+    _content="${1:-}"
+    printf '%b\n' "${COL_GRN}${_content}${COL_RST}"
+    unset _content
+}
+
+panel_warn() {
+    _content="${1:-}"
+    printf '%b\n' "${COL_YLW}${_content}${COL_RST}"
+    unset _content
+}
+
+panel_error() {
+    _content="${1:-}"
+    printf '%b\n' "${COL_RED}${_content}${COL_RST}"
+    unset _content
+}
+
 # ask - Interactive menu with volume key support
 # Usage: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
 ask() {
