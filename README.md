@@ -171,6 +171,40 @@ State is stored under `$KAM_HOME/.state/fswatch` by default. Override with
 Keep watch commands short and idempotent. Start long-running file watchers from
 runtime phases such as `service`, not from install/customize paths.
 
+## Notification
+
+`import notify` loads a small Android notification helper. It uses
+`cmd notification post`, which is available from Android shell/root
+environments and does not require a bundled app. Importing it does not post
+anything.
+
+Public API:
+
+```sh
+import notify
+
+notify post magicnet_guard "MagicNet" "core restarted"
+notify alert magicnet_guard "MagicNet" "core restarted"
+notify expand
+notify test
+```
+
+`notify post` sends or replaces a notification with the same tag. `notify alert`
+posts the notification and then asks SystemUI to expand the notification shade;
+this is useful on ROMs that accept shell notifications but suppress heads-up
+banners for the `shell_cmd` channel.
+
+Environment overrides:
+
+- `KAM_NOTIFY_AS_SHELL=0`: skip the default `su shell -c` notification path
+- `KAM_NOTIFY_ICON`: icon spec passed to `cmd notification post -i`
+- `KAM_NOTIFY_STYLE`: style passed to `cmd notification post -S`
+- `KAM_NOTIFY_VERBOSE=1`: keep `cmd notification post -v` output visible
+
+Avoid relying on `service call notification` transaction numbers for toast
+messages. Those Binder interfaces are Android-version dependent and are not a
+stable kamfw API.
+
 ## Validation
 
 Useful local checks from the Kam repository root:
