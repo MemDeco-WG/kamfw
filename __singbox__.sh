@@ -65,7 +65,7 @@ singbox_set_ui_redirect() {
 }
 
 singbox_set_default() {
-    _url="http://127.0.0.1:8080/ui"
+    _url="http://127.0.0.1:9090/ui/"
     singbox_set_ui_redirect "$_url"
     unset _url
 }
