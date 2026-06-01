@@ -139,6 +139,53 @@ singbox_tun() {
 
 }
 
+singbox_default_interface() {
+    ip route show table all 2>/dev/null |
+        awk '
+            /^default / && / dev / && $0 !~ / table (dummy0|local|main) / && $0 !~ / dev (dummy0|tun[0-9]*|utun|lo) / {
+                for (i = 1; i <= NF; i++) {
+                    if ($i == "dev") {
+                        print $(i + 1)
+                        exit
+                    }
+                }
+            }
+        '
+}
+
+singbox_prepare_route_config() {
+    _config="$1"
+    [ -f "$_config" ] || return 0
+    _iface=$(singbox_default_interface)
+    [ -n "$_iface" ] || return 0
+
+    _tmp="${_config}.route.new"
+    awk -v iface="$_iface" '
+        BEGIN {
+            in_route = 0
+            has_default_interface = 0
+        }
+        /^[[:space:]]*"route"[[:space:]]*:/ {
+            in_route = 1
+        }
+        in_route && /^[[:space:]]*"default_interface"[[:space:]]*:/ {
+            print "    \"default_interface\": \"" iface "\","
+            has_default_interface = 1
+            next
+        }
+        in_route && /^[[:space:]]*"auto_detect_interface"[[:space:]]*:/ {
+            print "    \"auto_detect_interface\": false,"
+            next
+        }
+        in_route && !has_default_interface && /^[[:space:]]*"default_domain_resolver"[[:space:]]*:/ {
+            print "    \"default_interface\": \"" iface "\","
+            has_default_interface = 1
+        }
+        { print }
+    ' "$_config" >"$_tmp" && mv -f "$_tmp" "$_config" || rm -f "$_tmp"
+    unset _config _iface _tmp
+}
+
 singbox_start() {
     if is_singbox_running; then
         warn "sing-box is already running."
@@ -156,6 +203,7 @@ singbox_start() {
         return 1
     fi
 
+    singbox_prepare_route_config "$_config"
     [ -d "${MODDIR}/.log" ] || mkdir -p "${MODDIR}/.log"
 
     info "Starting sing-box..."
@@ -181,19 +229,23 @@ singbox_start() {
 singbox_stop() {
     if is_singbox_running; then
         info "Stopping sing-box..."
-        pkill -f "sing-box"
+        _pids=$(singbox_pids)
+        [ -n "$_pids" ] && kill $_pids 2>/dev/null || true
         sleep 1
         # 再次检查，如果还在运行则强杀
         if is_singbox_running; then
-            killall -9 sing-box 2>/dev/null || true
+            _pids=$(singbox_pids)
+            [ -n "$_pids" ] && kill -9 $_pids 2>/dev/null || true
         fi
     fi
 
     if ! is_singbox_running; then
         success "sing-box stopped."
+        unset _pids
         return 0
     else
         error "Failed to stop sing-box."
+        unset _pids
         return 1
     fi
 }
