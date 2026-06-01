@@ -117,6 +117,30 @@ Available panel helpers are:
 Panels use terminal colors only on TTY. Non-TTY and manager UI output stays
 plain text with stable borders, so it remains readable in install logs.
 
+## Watchdog
+
+`import watchdog` loads an explicit watchdog helper. Importing it does not start
+any background process; modules must call the API deliberately from a lifecycle
+phase such as `service`.
+
+Public API:
+
+```sh
+import watchdog
+
+watchdog once 'command -v sing-box >/dev/null'
+watchdog start network-check 30 'ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1'
+watchdog status network-check
+watchdog stop network-check
+```
+
+State is stored under `$KAM_HOME/.state/watchdog` by default. Override with
+`KAM_WATCHDOG_STATE_DIR` when a module needs a different state directory.
+
+Keep watchdog commands idempotent and short. Do not start long-running watchdogs
+during install; start them from `service` or another runtime phase where a
+background loop is expected.
+
 ## Validation
 
 Useful local checks from the Kam repository root:
