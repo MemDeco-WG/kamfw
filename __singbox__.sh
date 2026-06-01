@@ -229,7 +229,9 @@ ask_toggle_singbox() {
     else
         _singbox_state="$(i18n 'NOT_RUNNING')"
     fi
-    guide "$(i18n 'SINGBOX_STATUS')" "$_singbox_state"
+    panel "$(i18n 'SINGBOX_STATUS')"
+    panel_row "$(i18n 'SINGBOX_STATUS')" "$_singbox_state"
+    panel_end
     ask "TOGGLE_SINGBOX" \
         "CONFIRM" \
         'toggle_singbox' \

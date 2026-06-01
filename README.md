@@ -94,6 +94,29 @@ Do not add `|| echo ...` fallback output paths. Use a small helper or an
 explicit fallback variable, then send the final message through the logging
 wrapper.
 
+`import rich` provides small UI helpers for installer and action screens:
+
+```sh
+panel "Module status"
+panel_row "Version" "$KAM_MODULE_VERSION"
+panel_divider
+panel_success "Ready"
+panel_warn "Optional config not found"
+panel_error "Service failed"
+panel_end
+```
+
+Available panel helpers are:
+
+- `panel [title]` / `panel_end`
+- `panel_line <text>` / `panel_blank` / `panel_divider`
+- `panel_row <label> <value>`
+- `panel_status <info|success|warn|error> <text>`
+- `panel_note`, `panel_success`, `panel_warn`, `panel_error`
+
+Panels use terminal colors only on TTY. Non-TTY and manager UI output stays
+plain text with stable borders, so it remains readable in install logs.
+
 ## Validation
 
 Useful local checks from the Kam repository root:
@@ -125,6 +148,19 @@ MODPATH="$tmp/out" KAM_MODULE_ROOT="$tmp/src" sh -c \
   '. "$0"; import __installer__; install_reset_filters; install_include "bin/*"; installer run' \
   "$tmp/out/lib/kamfw/.kamfwrc"
 test -x "$tmp/out/bin/foo"
+```
+
+Panel helper smoke test:
+
+```sh
+tmp=$(mktemp -d /tmp/kamfw-panel.XXXXXX)
+mkdir -p "$tmp/out/.config/kamfw" "$tmp/out/lib"
+cp -a tmpl/kam_template/src/<module-id>/lib/kamfw "$tmp/out/lib/kamfw"
+printf 'KAMFW_DIR=%s\nKAM_MODULES=""\nKAM_HOME=%s\n' \
+  "$tmp/out/lib/kamfw" "$tmp/home" > "$tmp/out/.config/kamfw/.envrc"
+MODPATH="$tmp/out" sh -c \
+  '. "$0"; import rich; PANEL_WIDTH=44 panel "kamfw"; panel_row "Module" "demo"; panel_success "ready"; panel_end' \
+  "$tmp/out/lib/kamfw/.kamfwrc"
 ```
 
 ## Thanks

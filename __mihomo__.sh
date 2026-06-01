@@ -273,7 +273,9 @@ ask_toggle_mihomo() {
 	else
 		_mihomo_state="$(i18n 'NOT_RUNNING')"
 	fi
-	guide "$(i18n 'MIHOMO_STATUS')" "$_mihomo_state"
+	panel "$(i18n 'MIHOMO_STATUS')"
+	panel_row "$(i18n 'MIHOMO_STATUS')" "$_mihomo_state"
+	panel_end
 	ask "TOGGLE_MIHOMO" \
 		"CONFIRM" \
 		'toggle_mihomo' \
