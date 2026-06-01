@@ -39,7 +39,9 @@ active_termux_env() {
         unset _env_file _T_HOME _T_BIN _new_PATH _extra
         info "[*] Termux environment activated."
     fi
-    [ -n "$(type dedup_path 2>/dev/null)" ] && dedup_path
+    if command -v dedup_path >/dev/null 2>&1; then
+        dedup_path
+    fi
 }
 
 deactivate_termux_env() {

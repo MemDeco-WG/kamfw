@@ -65,7 +65,7 @@ singbox_set_ui_redirect() {
 }
 
 singbox_set_default() {
-    _url="http://127.0.0.1:8080/ui"
+    _url="http://127.0.0.1:9090/ui/"
     singbox_set_ui_redirect "$_url"
     unset _url
 }
@@ -100,10 +100,21 @@ singbox_ask_webui() {
         0
 }
 
+singbox_pids() {
+    for _proc_comm in /proc/[0-9]*/comm; do
+        [ -r "$_proc_comm" ] || continue
+        if [ "$(cat "$_proc_comm" 2>/dev/null)" = "sing-box" ]; then
+            _pid=${_proc_comm#/proc/}
+            printf '%s\n' "${_pid%/comm}"
+        fi
+    done
+    unset _proc_comm _pid
+}
+
 is_singbox_running() {
     # Check if sing-box is running.
     # Returns 0 if sing-box is running, 1 otherwise.
-    if pgrep -f "sing-box" >/dev/null; then
+    if [ -n "$(singbox_pids)" ]; then
         config set override.description "$(i18n 'SINGBOX_STATUS'): $(i18n 'RUNNING')"
         return 0
     else

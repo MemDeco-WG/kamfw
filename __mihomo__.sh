@@ -99,11 +99,14 @@ ask_webui() {
 }
 
 mihomo_pids() {
-	if command -v pidof >/dev/null 2>&1; then
-		pidof mihomo 2>/dev/null && return 0
-	fi
-
-	pgrep -f '(^|/| )mihomo( |$)' 2>/dev/null
+	for _proc_comm in /proc/[0-9]*/comm; do
+		[ -r "$_proc_comm" ] || continue
+		if [ "$(cat "$_proc_comm" 2>/dev/null)" = "mihomo" ]; then
+			_pid=${_proc_comm#/proc/}
+			printf '%s\n' "${_pid%/comm}"
+		fi
+	done
+	unset _proc_comm _pid
 }
 
 mihomo_set_status_description() {
