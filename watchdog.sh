@@ -148,24 +148,28 @@ watchdog_start() {
 		return 2
 	fi
 
-	if _wd_existing_pid="$(watchdog_status "$_wd_name" 2>/dev/null)"; then
-		watchdog_stop "$_wd_name" >/dev/null 2>&1 || true
+	_wd_start_name="$_wd_name"
+	_wd_start_interval="$_wd_interval"
+	_wd_start_cmd="$_wd_cmd"
+
+	if _wd_existing_pid="$(watchdog_status "$_wd_start_name" 2>/dev/null)"; then
+		watchdog_stop "$_wd_start_name" >/dev/null 2>&1 || true
 	fi
 
-	_wd_pid_file="$(watchdog_pid_file "$_wd_name")" || return 1
+	_wd_pid_file="$(watchdog_pid_file "$_wd_start_name")" || return 1
 	(
 		while :; do
-			if ! sh -c "$_wd_cmd"; then
-				warn "watchdog $_wd_name: command failed"
+			if ! sh -c "$_wd_start_cmd"; then
+				warn "watchdog $_wd_start_name: command failed"
 			fi
-			sleep "$_wd_interval"
+			sleep "$_wd_start_interval"
 		done
 	) &
 	_wd_pid=$!
 	print "$_wd_pid" >"$_wd_pid_file"
-	success "$(i18n WATCHDOG_STARTED | t "$_wd_name" "$_wd_pid")"
+	success "$(i18n WATCHDOG_STARTED | t "$_wd_start_name" "$_wd_pid")"
 
-	unset _wd_name _wd_interval _wd_cmd _wd_pid_file _wd_pid _wd_existing_pid
+	unset _wd_name _wd_interval _wd_cmd _wd_start_name _wd_start_interval _wd_start_cmd _wd_pid_file _wd_pid _wd_existing_pid
 }
 
 watchdog() {

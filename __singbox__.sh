@@ -101,6 +101,14 @@ singbox_ask_webui() {
 }
 
 singbox_pids() {
+    if command -v pidof >/dev/null 2>&1; then
+        pidof sing-box 2>/dev/null | tr ' ' '\n'
+        _pidof_rc=$?
+        [ "$_pidof_rc" -eq 0 ] && {
+            unset _pidof_rc
+            return 0
+        }
+    fi
     for _proc_comm in /proc/[0-9]*/comm; do
         [ -r "$_proc_comm" ] || continue
         if [ "$(cat "$_proc_comm" 2>/dev/null)" = "sing-box" ]; then
@@ -108,7 +116,7 @@ singbox_pids() {
             printf '%s\n' "${_pid%/comm}"
         fi
     done
-    unset _proc_comm _pid
+    unset _pidof_rc _proc_comm _pid
 }
 
 is_singbox_running() {
@@ -154,12 +162,12 @@ singbox_default_interface() {
 }
 
 singbox_prepare_route_config() {
-    _config="$1"
-    [ -f "$_config" ] || return 0
+    _singbox_route_config="$1"
+    [ -f "$_singbox_route_config" ] || return 0
     _iface=$(singbox_default_interface)
     [ -n "$_iface" ] || return 0
 
-    _tmp="${_config}.route.new"
+    _tmp="${_singbox_route_config}.route.new"
     awk -v iface="$_iface" '
         BEGIN {
             in_route = 0
@@ -182,8 +190,8 @@ singbox_prepare_route_config() {
             has_default_interface = 1
         }
         { print }
-    ' "$_config" >"$_tmp" && mv -f "$_tmp" "$_config" || rm -f "$_tmp"
-    unset _config _iface _tmp
+    ' "$_singbox_route_config" >"$_tmp" && mv -f "$_tmp" "$_singbox_route_config" || rm -f "$_tmp"
+    unset _singbox_route_config _iface _tmp
 }
 
 singbox_start() {
@@ -194,9 +202,9 @@ singbox_start() {
 
     singbox_tun
 
-    local _config="${MODDIR}/.config/sing-box/config.json"
-    local _log="${MODDIR}/.log/sing-box.log"
-    local _workdir="${MODDIR}/.config/sing-box"
+    _config="${MODDIR}/.config/sing-box/config.json"
+    _log="${MODDIR}/.log/sing-box.log"
+    _workdir="${MODDIR}/.config/sing-box"
 
     if [ ! -f "$_config" ]; then
         error "Config file not found: $_config"
@@ -224,6 +232,7 @@ singbox_start() {
         fi
         return 1
     fi
+    unset _config _log _workdir
 }
 
 singbox_stop() {

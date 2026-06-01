@@ -113,6 +113,20 @@ fswatch_require_tools() {
 	unset _fw_tool
 }
 
+fswatch_path_is_pruned() {
+	_fw_prune_path="$1"
+	for _fw_prune_name in ${KAM_FSWATCH_PRUNE_NAMES:-}; do
+		case "$_fw_prune_path" in
+		*/"$_fw_prune_name"|*/"$_fw_prune_name"/*)
+			unset _fw_prune_path _fw_prune_name
+			return 0
+			;;
+		esac
+	done
+	unset _fw_prune_path _fw_prune_name
+	return 1
+}
+
 fswatch_snapshot() {
 	_fw_path="$1"
 	[ -z "$_fw_path" ] && {
@@ -128,9 +142,11 @@ fswatch_snapshot() {
 	if [ -d "$_fw_path" ]; then
 		{
 			find "$_fw_path" -type d -print 2>/dev/null | while IFS= read -r _fw_item || [ -n "$_fw_item" ]; do
+				fswatch_path_is_pruned "$_fw_item" && continue
 				printf 'D %s\n' "$_fw_item"
 			done
 			find "$_fw_path" -type f -print 2>/dev/null | while IFS= read -r _fw_item || [ -n "$_fw_item" ]; do
+				fswatch_path_is_pruned "$_fw_item" && continue
 				cksum "$_fw_item" 2>/dev/null | sed 's/^/F /'
 			done
 		} | sort
@@ -251,31 +267,41 @@ fswatch_start() {
 		return 1
 	}
 
-	if _fw_existing_pid="$(fswatch_status "$_fw_name" 2>/dev/null)"; then
-		fswatch_stop "$_fw_name" >/dev/null 2>&1 || true
+	_fw_start_name="$_fw_name"
+	_fw_start_path="$_fw_path"
+	_fw_start_interval="$_fw_interval"
+	_fw_start_cmd="$_fw_cmd"
+
+	if _fw_existing_pid="$(fswatch_status "$_fw_start_name" 2>/dev/null)"; then
+		fswatch_stop "$_fw_start_name" >/dev/null 2>&1 || true
 	fi
 
-	_fw_pid_file="$(fswatch_pid_file "$_fw_name")" || return 1
-	_fw_snapshot_file="$(fswatch_snapshot_file "$_fw_name")" || return 1
-	fswatch_snapshot "$_fw_path" >"$_fw_snapshot_file" || return 1
+	_fw_pid_file="$(fswatch_pid_file "$_fw_start_name")" || return 1
+	_fw_snapshot_file="$(fswatch_snapshot_file "$_fw_start_name")" || return 1
+	_fw_loop_name="$_fw_start_name"
+	_fw_loop_path="$_fw_start_path"
+	_fw_loop_interval="$_fw_start_interval"
+	_fw_loop_cmd="$_fw_start_cmd"
+	_fw_loop_snapshot_file="$_fw_snapshot_file"
+	fswatch_snapshot "$_fw_loop_path" >"$_fw_loop_snapshot_file" || return 1
 
 	(
 		while :; do
-			if fswatch_changed "$_fw_path" "$_fw_snapshot_file"; then
-				info "$(i18n FSWATCH_CHANGED | t "$_fw_name")"
-				KAM_FSWATCH_NAME="$_fw_name" \
-					KAM_FSWATCH_PATH="$_fw_path" \
-					KAM_FSWATCH_SNAPSHOT="$_fw_snapshot_file" \
-					sh -c "$_fw_cmd"
+			if fswatch_changed "$_fw_loop_path" "$_fw_loop_snapshot_file"; then
+				info "$(i18n FSWATCH_CHANGED | t "$_fw_loop_name")"
+				KAM_FSWATCH_NAME="$_fw_loop_name" \
+					KAM_FSWATCH_PATH="$_fw_loop_path" \
+					KAM_FSWATCH_SNAPSHOT="$_fw_loop_snapshot_file" \
+					sh -c "$_fw_loop_cmd"
 			fi
-			sleep "$_fw_interval"
+			sleep "$_fw_loop_interval"
 		done
 	) &
 	_fw_pid=$!
 	print "$_fw_pid" >"$_fw_pid_file"
-	success "$(i18n FSWATCH_STARTED | t "$_fw_name" "$_fw_pid")"
+	success "$(i18n FSWATCH_STARTED | t "$_fw_start_name" "$_fw_pid")"
 
-	unset _fw_name _fw_path _fw_interval _fw_cmd _fw_pid_file _fw_snapshot_file _fw_pid _fw_existing_pid
+	unset _fw_name _fw_path _fw_interval _fw_cmd _fw_start_name _fw_start_path _fw_start_interval _fw_start_cmd _fw_pid_file _fw_snapshot_file _fw_loop_name _fw_loop_path _fw_loop_interval _fw_loop_cmd _fw_loop_snapshot_file _fw_pid _fw_existing_pid
 }
 
 fswatch() {
