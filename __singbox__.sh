@@ -101,11 +101,14 @@ singbox_ask_webui() {
 }
 
 singbox_pids() {
-    if command -v pidof >/dev/null 2>&1; then
-        pidof sing-box 2>/dev/null && return 0
-    fi
-
-    pgrep -f '(^|/| )sing-box( |$)' 2>/dev/null
+    for _proc_comm in /proc/[0-9]*/comm; do
+        [ -r "$_proc_comm" ] || continue
+        if [ "$(cat "$_proc_comm" 2>/dev/null)" = "sing-box" ]; then
+            _pid=${_proc_comm#/proc/}
+            printf '%s\n' "${_pid%/comm}"
+        fi
+    done
+    unset _proc_comm _pid
 }
 
 is_singbox_running() {
