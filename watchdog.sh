@@ -184,5 +184,7 @@ watchdog() {
 		return 2
 		;;
 	esac
+	_wd_rc=$?
 	unset _wd_action
+	return "$_wd_rc"
 }

@@ -141,6 +141,36 @@ Keep watchdog commands idempotent and short. Do not start long-running watchdogs
 during install; start them from `service` or another runtime phase where a
 background loop is expected.
 
+## File Change Watcher
+
+`import fswatch` loads an explicit asynchronous file change monitor. It uses
+polling snapshots, so it does not require `inotify` and works on minimal Android
+shell environments. Importing it does not start any background process.
+
+Public API:
+
+```sh
+import fswatch
+
+fswatch snapshot "$MODDIR/config"
+fswatch changed "$MODDIR/config" "$KAM_HOME/.state/config.snapshot"
+fswatch start config-watch "$MODDIR/config" 5 'kamfw run action -- reload-config'
+fswatch status config-watch
+fswatch stop config-watch
+```
+
+When a change is detected, the command runs with:
+
+- `KAM_FSWATCH_NAME`
+- `KAM_FSWATCH_PATH`
+- `KAM_FSWATCH_SNAPSHOT`
+
+State is stored under `$KAM_HOME/.state/fswatch` by default. Override with
+`KAM_FSWATCH_STATE_DIR` when needed.
+
+Keep watch commands short and idempotent. Start long-running file watchers from
+runtime phases such as `service`, not from install/customize paths.
+
 ## Validation
 
 Useful local checks from the Kam repository root:
