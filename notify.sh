@@ -87,11 +87,17 @@ notify_post_cmd() {
 	_npc_text="$3"
 	_npc_icon="${KAM_NOTIFY_ICON:-@android:drawable/stat_notify_error}"
 	_npc_style="${KAM_NOTIFY_STYLE:-bigtext}"
-	_npc_cmd="cmd notification post -S $(notify_quote "$_npc_style") -i $(notify_quote "$_npc_icon") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
-	_npc_fallback_cmd="cmd notification post -S $(notify_quote "$_npc_style") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
+	_npc_verbose_arg=""
+	[ "${KAM_NOTIFY_VERBOSE:-0}" = "1" ] && _npc_verbose_arg="-v "
+	_npc_cmd="cmd notification post ${_npc_verbose_arg}-S $(notify_quote "$_npc_style") -i $(notify_quote "$_npc_icon") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
+	_npc_fallback_cmd="cmd notification post ${_npc_verbose_arg}-S $(notify_quote "$_npc_style") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
 
 	if [ "${KAM_NOTIFY_VERBOSE:-0}" = "1" ]; then
-		cmd notification post -v -S "$_npc_style" -i "$_npc_icon" -t "$_npc_title" "$_npc_tag" "$_npc_text"
+		notify_run_as_shell "$_npc_cmd"
+		_npc_rc=$?
+		[ "$_npc_rc" -eq 0 ] || notify_run_as_shell "$_npc_fallback_cmd"
+		_npc_rc=$?
+		[ "$_npc_rc" -eq 0 ] || cmd notification post -v -S "$_npc_style" -i "$_npc_icon" -t "$_npc_title" "$_npc_tag" "$_npc_text"
 		_npc_rc=$?
 		[ "$_npc_rc" -eq 0 ] || cmd notification post -v -S "$_npc_style" -t "$_npc_title" "$_npc_tag" "$_npc_text"
 		_npc_rc=$?
@@ -106,7 +112,7 @@ notify_post_cmd() {
 		_npc_rc=$?
 	fi
 
-	unset _npc_tag _npc_title _npc_text _npc_icon _npc_style _npc_cmd _npc_fallback_cmd
+	unset _npc_tag _npc_title _npc_text _npc_icon _npc_style _npc_verbose_arg _npc_cmd _npc_fallback_cmd
 	return "$_npc_rc"
 }
 

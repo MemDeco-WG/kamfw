@@ -130,12 +130,17 @@ import watchdog
 
 watchdog once 'command -v sing-box >/dev/null'
 watchdog start network-check 30 'ping -c 1 -W 1 8.8.8.8 >/dev/null 2>&1'
+watchdog start --notify core-check 30 'pidof mihomo >/dev/null 2>&1'
 watchdog status network-check
 watchdog stop network-check
 ```
 
 State is stored under `$KAM_HOME/.state/watchdog` by default. Override with
 `KAM_WATCHDOG_STATE_DIR` when a module needs a different state directory.
+
+Failure notifications are opt-in. Use `watchdog start --notify ...`, or set
+`KAM_WATCHDOG_NOTIFY=1`. The notification title defaults to `kamfw watchdog` and
+can be changed with `KAM_WATCHDOG_NOTIFY_TITLE`.
 
 Keep watchdog commands idempotent and short. Do not start long-running watchdogs
 during install; start them from `service` or another runtime phase where a

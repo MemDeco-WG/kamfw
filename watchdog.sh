@@ -40,6 +40,12 @@ set_i18n "WATCHDOG_NOT_RUNNING" \
 	"ja" "watchdog は実行されていません: \$_1" \
 	"ko" "watchdog 실행 중 아님: \$_1"
 
+set_i18n "WATCHDOG_COMMAND_FAILED" \
+	"zh" "watchdog \$_1: 命令失败" \
+	"en" "watchdog \$_1: command failed" \
+	"ja" "watchdog \$_1: コマンドが失敗しました" \
+	"ko" "watchdog \$_1: 명령 실패"
+
 watchdog_state_dir() {
 	: "${KAM_HOME:=${MODDIR:-${0%/*}}}"
 	_wd_dir="${KAM_WATCHDOG_STATE_DIR:-$KAM_HOME/.state/watchdog}"
@@ -128,6 +134,21 @@ watchdog_once() {
 }
 
 watchdog_start() {
+	_wd_notify="${KAM_WATCHDOG_NOTIFY:-0}"
+	while [ $# -gt 0 ]; do
+		case "$1" in
+		--notify | --alert)
+			_wd_notify=1
+			shift
+			;;
+		--no-notify | --quiet)
+			_wd_notify=0
+			shift
+			;;
+		*) break ;;
+		esac
+	done
+
 	_wd_name="$1"
 	_wd_interval="$2"
 	shift 2 2>/dev/null || true
@@ -151,6 +172,7 @@ watchdog_start() {
 	_wd_start_name="$_wd_name"
 	_wd_start_interval="$_wd_interval"
 	_wd_start_cmd="$_wd_cmd"
+	_wd_start_notify="$_wd_notify"
 
 	if _wd_existing_pid="$(watchdog_status "$_wd_start_name" 2>/dev/null)"; then
 		watchdog_stop "$_wd_start_name" >/dev/null 2>&1 || true
@@ -160,7 +182,17 @@ watchdog_start() {
 	(
 		while :; do
 			if ! sh -c "$_wd_start_cmd"; then
-				warn "watchdog $_wd_start_name: command failed"
+				_wd_fail_msg="$(i18n WATCHDOG_COMMAND_FAILED | t "$_wd_start_name")"
+				warn "$_wd_fail_msg"
+				if [ "$_wd_start_notify" = "1" ]; then
+					if ! command -v notify >/dev/null 2>&1; then
+						import notify >/dev/null 2>&1 || true
+					fi
+					if command -v notify >/dev/null 2>&1; then
+						notify alert "kamfw_watchdog_$_wd_start_name" "${KAM_WATCHDOG_NOTIFY_TITLE:-kamfw watchdog}" "$_wd_fail_msg" >/dev/null 2>&1 || true
+					fi
+				fi
+				unset _wd_fail_msg
 			fi
 			sleep "$_wd_start_interval"
 		done
@@ -169,7 +201,7 @@ watchdog_start() {
 	print "$_wd_pid" >"$_wd_pid_file"
 	success "$(i18n WATCHDOG_STARTED | t "$_wd_start_name" "$_wd_pid")"
 
-	unset _wd_name _wd_interval _wd_cmd _wd_start_name _wd_start_interval _wd_start_cmd _wd_pid_file _wd_pid _wd_existing_pid
+	unset _wd_notify _wd_name _wd_interval _wd_cmd _wd_start_name _wd_start_interval _wd_start_cmd _wd_start_notify _wd_pid_file _wd_pid _wd_existing_pid
 }
 
 watchdog() {
@@ -181,7 +213,7 @@ watchdog() {
 	status) watchdog_status "$@" ;;
 	once) watchdog_once "$@" ;;
 	*)
-		print "Usage: watchdog start <name> <interval_sec> <command...>"
+		print "Usage: watchdog start [--notify|--alert] <name> <interval_sec> <command...>"
 		print "       watchdog stop <name>"
 		print "       watchdog status <name>"
 		print "       watchdog once <command...>"
