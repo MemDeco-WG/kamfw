@@ -145,7 +145,7 @@ debug() {
 # ---------------------------------------------------------------------------
 log() {
 	: "${MODDIR:=${0%/*}}"
-	: "${KAM_LOGFILE:=${MODDIR}/kam.log}"
+	: "${KAM_LOGFILE:=${MODDIR}/.log/kam.log}"
 	_logfile="${KAM_LOGFILE}"
 	_mode="append"
 	_rotate_opt=""
