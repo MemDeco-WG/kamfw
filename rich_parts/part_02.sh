@@ -1,3 +1,4 @@
+# shellcheck shell=ash
 panel() {
     _title="${1:-}"
     newline

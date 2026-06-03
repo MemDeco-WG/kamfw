@@ -1,3 +1,4 @@
+# shellcheck shell=ash
 confirm_update_file() {
     _relative_path="$1"
 
