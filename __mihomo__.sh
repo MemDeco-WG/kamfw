@@ -59,7 +59,7 @@ mihomo_set_ui_redirect() {
 }
 
 set_default() {
-	_url="http://127.0.0.1:9090/ui/cubex"
+	_url="https://metacubex.github.io/metacubexd/#/setup?hostname=127.0.0.1&port=9090&secret="
 	mihomo_set_ui_redirect "$_url"
 	unset _url
 }
@@ -75,10 +75,10 @@ set_i18n "SET_UI_REDIRECT" \
 	"ja" "WebUI リダイレクト設定" \
 	"ko" "WebUI 리디렉션 설정"
 set_i18n "USE_DEFAULT" \
-	"zh" "使用本地默认" \
-	"en" "Use local default" \
-	"ja" "ローカルのデフォルトを使用" \
-	"ko" "로컬 기본 사용"
+	"zh" "使用 MetaCubeX 外部前端" \
+	"en" "Use external MetaCubeX frontend" \
+	"ja" "外部 MetaCubeX フロントエンドを使用" \
+	"ko" "외부 MetaCubeX 프론트엔드 사용"
 set_i18n "USE_YACD" \
 	"zh" "使用 Yacd 前端" \
 	"en" "Use Yacd frontend" \
