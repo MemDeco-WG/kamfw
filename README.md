@@ -203,6 +203,37 @@ State is stored under `$KAM_HOME/.state/fswatch` by default. Override with
 Keep watch commands short and idempotent. Start long-running file watchers from
 runtime phases such as `service`, not from install/customize paths.
 
+## Cached Downloads
+
+`import cache_download` loads a cached download helper. It is useful for runtime
+data files, rule sets, and small tools that should only replace the installed
+file when content changes. Importing it does not download anything.
+
+Public API:
+
+```sh
+import cache_download
+
+cache_download "https://example.com/rules.dat" "$KAM_HOME/.config/rules.dat"
+cache_download --hash "$sha256" "$url" "$dest"
+cache_download --hash-url "$url.sha256" "$url" "$dest"
+download_if_changed "$url" "$dest"
+```
+
+The helper downloads to a temporary file, computes sha256, and compares it with
+the cached hash before replacing the destination. The result is exported as
+`KAM_CACHE_DOWNLOAD_CHANGED=1` for updates and `0` when the destination is
+unchanged.
+
+Default hash state is stored under `$KAM_HOME/.cache/downloads`. Override with:
+
+```sh
+KAM_CACHE_DOWNLOAD_STATE_DIR="$KAM_HOME/.cache/my-downloads"
+```
+
+Use `--hash-file <file>` when a module wants to keep a stable, human-readable
+state file next to related config.
+
 ## Notification
 
 `import notify` loads a small Android notification helper. It uses
