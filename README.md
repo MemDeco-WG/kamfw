@@ -117,6 +117,33 @@ Available panel helpers are:
 Panels use terminal colors only on TTY. Non-TTY and manager UI output stays
 plain text with stable borders, so it remains readable in install logs.
 
+## Log Rotation
+
+`logging` can rotate the active log before appending a new line:
+
+```sh
+KAM_LOG_ROTATE_SIZE=256k
+KAM_LOG_ROTATE_KEEP=3
+info "service started"
+```
+
+The same behavior is available per call:
+
+```sh
+log --file "$MODDIR/service.log" --rotate 1m --rotate-keep 5 "service ready"
+```
+
+Rotation uses numbered backups: `service.log.1`, `service.log.2`, and so on.
+`KAM_LOG_ROTATE_SIZE` accepts plain bytes or `k`, `m`, and `g` suffixes.
+`KAM_LOG_ROTATE_KEEP=0` truncates the current log instead of keeping backups.
+
+Modules can also call the helper directly:
+
+```sh
+import logrotate
+logrotate --size 1m --keep 5 "$MODDIR/service.log"
+```
+
 ## Watchdog
 
 `import watchdog` loads an explicit watchdog helper. Importing it does not start

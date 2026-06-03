@@ -140,7 +140,7 @@ debug() {
 
 # ---------------------------------------------------------------------------
 # log(): append lines to the log file, supports options:
-#   -w/--overwrite, -f/--file <path>, -r/--rotate <size>
+#   -w/--overwrite, -f/--file <path>, -r/--rotate <size>, --rotate-keep <count>
 # Behavior follows previous implementation: timestamp + cleaned (ANSI-stripped) line.
 # ---------------------------------------------------------------------------
 log() {
@@ -149,7 +149,7 @@ log() {
 	_logfile="${KAM_LOGFILE}"
 	_mode="append"
 	_rotate_opt=""
-	_rotate_bytes=0
+	_rotate_keep="${KAM_LOG_ROTATE_KEEP:-1}"
 
 	while [ $# -gt 0 ]; do
 		case "$1" in
@@ -165,6 +165,10 @@ log() {
 			_rotate_opt="$2"
 			shift 2
 			;;
+		-k | --rotate-keep)
+			_rotate_keep="$2"
+			shift 2
+			;;
 		*) break ;;
 		esac
 	done
@@ -173,70 +177,19 @@ log() {
 		_rotate_opt="${KAM_LOG_ROTATE_SIZE}"
 	fi
 
-	if [ -n "${_rotate_opt:-}" ]; then
-		case "${_rotate_opt}" in
-		*[kK])
-			_num="${_rotate_opt%[kK]}"
-			case "${_num}" in
-			'' | *[!0-9]*)
-				_rotate_bytes=0
-				;;
-			*)
-				_rotate_bytes=$((_num * 1024))
-				;;
-			esac
-			;;
-		*[mM])
-			_num="${_rotate_opt%[mM]}"
-			case "${_num}" in
-			'' | *[!0-9]*)
-				_rotate_bytes=0
-				;;
-			*)
-				_rotate_bytes=$((_num * 1048576))
-				;;
-			esac
-			;;
-		*[gG])
-			_num="${_rotate_opt%[gG]}"
-			case "${_num}" in
-			'' | *[!0-9]*)
-				_rotate_bytes=0
-				;;
-			*)
-				_rotate_bytes=$((_num * 1073741824))
-				;;
-			esac
-			;;
-		*)
-			case "${_rotate_opt}" in
-			'' | *[!0-9]*)
-				_rotate_bytes=0
-				;;
-			*)
-				_rotate_bytes=$((_rotate_opt))
-				;;
-			esac
-			;;
-		esac
-	fi
-
 	if [ "$_mode" = "overwrite" ]; then
 		: >"$_logfile" 2>/dev/null || true
 	fi
 
 	_maybe_rotate() {
-		if [ "${_rotate_bytes:-0}" -le 0 ]; then
+		if [ -z "${_rotate_opt:-}" ]; then
 			return 0
 		fi
-		if [ -f "$_logfile" ]; then
-			_cur_size=$(wc -c <"$_logfile" 2>/dev/null || echo 0)
-			if [ "$_cur_size" -ge "$_rotate_bytes" ]; then
-				_bak="${_logfile}.b"
-				rm -f "$_bak" 2>/dev/null || true
-				mv "$_logfile" "$_bak" 2>/dev/null || true
-				: >"$_logfile" 2>/dev/null || true
-			fi
+		if ! command -v logrotate_file >/dev/null 2>&1; then
+			import logrotate >/dev/null 2>&1 || true
+		fi
+		if command -v logrotate_file >/dev/null 2>&1; then
+			logrotate_file --size "$_rotate_opt" --keep "$_rotate_keep" "$_logfile" >/dev/null 2>&1 || true
 		fi
 	}
 
@@ -260,5 +213,5 @@ log() {
 		fi
 	fi
 
-	unset _maybe_rotate _write_line _line _clean _msg _ln _cur_size _bak _rotate_opt _rotate_bytes _num
+	unset _maybe_rotate _write_line _line _clean _msg _ln _rotate_opt _rotate_keep
 }
