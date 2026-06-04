@@ -119,10 +119,15 @@ mihomo_pids() {
 
 mihomo_set_status_description() {
 	if [ "$1" = "running" ]; then
-		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'RUNNING')"
+		_mihomo_description="$(i18n 'MIHOMO_STATUS'): $(i18n 'RUNNING')"
 	else
-		config set override.description "$(i18n 'MIHOMO_STATUS'): $(i18n 'NOT_RUNNING')"
+		_mihomo_description="$(i18n 'MIHOMO_STATUS'): $(i18n 'NOT_RUNNING')"
 	fi
+	_mihomo_current_description="$(config get override.description 2>/dev/null || true)"
+	if [ "$_mihomo_current_description" != "$_mihomo_description" ]; then
+		config set override.description "$_mihomo_description"
+	fi
+	unset _mihomo_description _mihomo_current_description
 }
 
 is_mihomo_running() {
