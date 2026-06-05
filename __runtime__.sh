@@ -19,12 +19,8 @@ kamfw_init_home() {
     export HOME="$MODDIR"
 
     # 约定目录（类 XDG，但根是 $MODDIR）
-    # 注：按需求显式创建 .config/.local/...，不引入新的 .kam 根目录
     for _d in \
         "$KAM_HOME/.config" \
-        "$KAM_HOME/.local" \
-        "$KAM_HOME/.local/bin" \
-        "$KAM_HOME/.local/lib" \
         "$KAM_HOME/.cache" \
         "$KAM_HOME/.state" \
         "$KAM_HOME/.log" \
@@ -47,12 +43,10 @@ kamfw_init_termux() {
 # PATH / LD_LIBRARY_PATH
 # -----------------------------
 kamfw_init_paths() {
-    # 优先模块 HOME 的 .local/bin，其次模块自带 bin
-    # 再补齐 root manager 与系统常用路径
-    export PATH="$KAM_HOME/.local/bin:$MODDIR/bin:/data/adb/magisk:/data/adb/ksu/bin:/system/bin:/system/xbin:/sbin:$PATH"
+    # 优先模块自带 bin，再补齐 root manager 与系统常用路径
+    export PATH="$MODDIR/bin:/data/adb/magisk:/data/adb/ksu/bin:/system/bin:/system/xbin:/sbin:$PATH"
 
-    # 动态库优先模块 HOME 的 .local/lib
-    export LD_LIBRARY_PATH="$KAM_HOME/.local/lib:$MODDIR/lib:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="$MODDIR/lib:$LD_LIBRARY_PATH"
 }
 
 # -----------------------------

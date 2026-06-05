@@ -20,9 +20,6 @@ kam_init_dirs() {
   # Keep runtime state under $KAM_ROOT.
   _kam_dirs="\
 $KAM_HOME/.config \
-$KAM_HOME/.local \
-$KAM_HOME/.local/bin \
-$KAM_HOME/.local/lib \
 $KAM_HOME/.cache \
 $KAM_HOME/.state \
 $KAM_HOME/.log \

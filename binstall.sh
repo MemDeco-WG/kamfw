@@ -10,10 +10,10 @@
 #
 # Usage (examples):
 #   # simple direct URL (no extraction)
-#   binstall --name mihomo --target "$MODPATH/.local/bin" --url "https://example.com/mihomo" --chmod 0755
+#   binstall --name mihomo --target "$MODPATH/bin" --url "https://example.com/mihomo" --chmod 0755
 #
 #   # github release (latest tag), asset name may contain ${TAG} and ${ARCH} placeholders
-#   binstall --name mihomo --target "$MODPATH/.local/bin" \
+#   binstall --name mihomo --target "$MODPATH/bin" \
 #       --repo MetaCubeX/mihomo --asset "mihomo-${ARCH}-${TAG}.gz" --arch android-arm64-v8 \
 #       --chmod 0755 --version-file "$MODPATH/mihomo.version"
 #
