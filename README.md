@@ -47,6 +47,11 @@ Supported lifecycle phases are:
 - `post-mount`
 
 Default phase handlers are no-ops and can be overridden by module code.
+For startup behavior, use either `service` or `boot-completed` as the main
+business phase. kamfw handles root-manager compatibility dispatch, including
+script renaming for managers that do not expose every phase directly, so module
+business code should not branch on Magisk, KernelSU, APatch, or ShiroSU for
+lifecycle compatibility.
 
 ## Installer
 
