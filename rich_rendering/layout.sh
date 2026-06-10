@@ -221,23 +221,23 @@ panel_status() {
     _panel_content="${2:-}"
     case "$_panel_kind" in
     ok | success)
-        _panel_mark="✓"
+        _panel_mark="ok"
         _panel_mark=$(__rich_green "$_panel_mark")
         ;;
     warn | warning)
-        _panel_mark="!"
+        _panel_mark="warn"
         _panel_mark=$(__rich_yellow "$_panel_mark")
         ;;
     error | fail | failed)
-        _panel_mark="x"
+        _panel_mark="error"
         _panel_mark=$(__rich_red "$_panel_mark")
         ;;
     *)
-        _panel_mark="•"
+        _panel_mark="note"
         _panel_mark=$(__rich_cyan "$_panel_mark")
         ;;
     esac
-    panel_line "${_panel_mark} ${_panel_content}"
+    panel_line "[${_panel_mark}] ${_panel_content}"
     unset _panel_kind _panel_content _panel_mark
 }
 
@@ -256,4 +256,3 @@ panel_warn() {
 panel_error() {
     panel_status error "$1"
 }
-

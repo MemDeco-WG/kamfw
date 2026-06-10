@@ -105,27 +105,27 @@ cyan() { print "${COL_CYN}$1${COL_RST}"; }
 # (file output) only if the message is emitted (i.e., loglevel allows it).
 info() {
 	if __kam_should_emit INFO; then
-		green "INFO: $1"
+		green "[info] $1"
 		log "INFO: $1"
 	fi
 }
 
 warn() {
 	if __kam_should_emit WARN; then
-		yellow "WARN: $1"
+		yellow "[warn] $1"
 		log "WARN: $1"
 	fi
 }
 
 error() {
 	# Always show errors to console, but still respect loglevel check for consistency
-	red "ERROR: $1"
+	red "[error] $1"
 	log "ERROR: $1"
 }
 
 success() {
 	if __kam_should_emit INFO; then
-		green "$1"
+		green "[done] $1"
 		log "SUCCESS: $1"
 	fi
 }
