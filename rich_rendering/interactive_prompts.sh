@@ -43,6 +43,31 @@ panel_error() {
     unset _content
 }
 
+ask_can_redraw() {
+    [ -t 1 ] && [ -n "${ANSI_CURSOR_UP:-}" ] && [ -n "${ANSI_CLEAR_LINE:-}" ]
+}
+
+ask_print_option() {
+    _idx="$1"
+    _text="$2"
+    _selected="$3"
+    _num=$((_idx + 1))
+    if [ "$_selected" = "1" ]; then
+        printf '  %s\n' "$(__rich_cyan "> ${_num}. ${_text}")"
+    else
+        printf '%b\n' "    ${_num}. ${_text}"
+    fi
+    unset _idx _text _selected _num
+}
+
+ask_print_selection() {
+    _idx="$1"
+    _text="$2"
+    _num=$((_idx + 1))
+    printf '  %s\n' "$(__rich_cyan "> ${_num}. ${_text}")"
+    unset _idx _text _num
+}
+
 # ask - Interactive menu with volume key support
 # Usage: ask "QUESTION" "opt1_text" "opt1_cmd" "opt2_text" "opt2_cmd" ... [default_index]
 ask() {
@@ -102,15 +127,18 @@ ask() {
 
     _sel="$default_selected"
 
+    _can_redraw=0
+    ask_can_redraw && _can_redraw=1
+
     # initial render
     printf '%s\n' "$question"
     _i=0
     while [ "$_i" -lt "$_opt_count" ]; do
         eval "_txt=\$opt_text_${_i}"
         if [ "$_i" -eq "$_sel" ]; then
-            printf '%b\n' "${COL_CYN}-> ${_i}) ${_txt}${COL_RST}"
+            ask_print_option "$_i" "$_txt" 1
         else
-            printf '%b\n' "   ${_i}) ${_txt}"
+            ask_print_option "$_i" "$_txt" 0
         fi
         _i=$((_i + 1))
     done
@@ -123,28 +151,32 @@ ask() {
         case "$_k" in
         down)
             _sel=$(((_sel + 1) % _opt_count))
-            # move cursor up only for options + trailing blank line (not the question)
-            printf "${ANSI_CURSOR_UP}" "$((_opt_count + 1))"
+            if [ "$_can_redraw" = "1" ]; then
+                # move cursor up only for options + trailing blank line (not the question)
+                printf "${ANSI_CURSOR_UP}" "$((_opt_count + 1))"
 
-            _i=0
-            while [ "$_i" -lt "$_opt_count" ]; do
-                eval "_txt=\$opt_text_${_i}"
-                # clear entire line and redraw
-                printf "\r${ANSI_CLEAR_LINE}"
-                if [ "$_i" -eq "$_sel" ]; then
-                    printf '%b\n' "${COL_CYN}-> ${_i}) ${_txt}${COL_RST}"
-                else
-                    printf '%b\n' "   ${_i}) ${_txt}"
-                fi
-                _i=$((_i + 1))
-            done
-            # clear trailing blank line and emit a fresh one
-            printf "\r${ANSI_CLEAR_LINE}\n"
+                _i=0
+                while [ "$_i" -lt "$_opt_count" ]; do
+                    eval "_txt=\$opt_text_${_i}"
+                    printf "\r${ANSI_CLEAR_LINE}"
+                    if [ "$_i" -eq "$_sel" ]; then
+                        ask_print_option "$_i" "$_txt" 1
+                    else
+                        ask_print_option "$_i" "$_txt" 0
+                    fi
+                    _i=$((_i + 1))
+                done
+                # clear trailing blank line and emit a fresh one
+                printf "\r${ANSI_CLEAR_LINE}\n"
+            else
+                eval "_txt=\$opt_text_${_sel}"
+                ask_print_selection "$_sel" "$_txt"
+            fi
             ;;
         up)
             eval "_txt=\$opt_text_${_sel}"
             eval "_cmd=\$opt_cmd_${_sel}"
-            printf '%s\n' "$(i18n 'CONFIRM'): ${_txt}"
+            printf '  %s\n' "$(__rich_green "$(i18n 'CONFIRM'): ${_txt}")"
             eval "$_cmd"
             break
             ;;
@@ -152,6 +184,7 @@ ask() {
     done
     newline
 
+    unset _can_redraw
     return
 
 }
