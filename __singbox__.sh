@@ -119,14 +119,27 @@ singbox_pids() {
     unset _pidof_rc _proc_comm _pid
 }
 
+singbox_set_status_description() {
+    if [ "$1" = "running" ]; then
+        _singbox_description="$(i18n 'SINGBOX_STATUS'): $(i18n 'RUNNING')"
+    else
+        _singbox_description="$(i18n 'SINGBOX_STATUS'): $(i18n 'NOT_RUNNING')"
+    fi
+    _singbox_current_description="$(config get override.description 2>/dev/null || true)"
+    if [ "$_singbox_current_description" != "$_singbox_description" ]; then
+        config set override.description "$_singbox_description"
+    fi
+    unset _singbox_description _singbox_current_description
+}
+
 is_singbox_running() {
     # Check if sing-box is running.
     # Returns 0 if sing-box is running, 1 otherwise.
     if [ -n "$(singbox_pids)" ]; then
-        config set override.description "$(i18n 'SINGBOX_STATUS'): $(i18n 'RUNNING')"
+        singbox_set_status_description running
         return 0
     else
-        config set override.description "$(i18n 'SINGBOX_STATUS'): $(i18n 'NOT_RUNNING')"
+        singbox_set_status_description stopped
         return 1
     fi
 }
@@ -135,8 +148,10 @@ singbox_tun() {
     mkdir -p /dev/net
     info "创建/dev/net/目录"
 
-    [ ! -L /dev/net/tun ] && ln -s /dev/tun /dev/net/tun
-    info "创建/dev/net/tun符号链接"
+    if [ ! -e /dev/net/tun ]; then
+        ln -s /dev/tun /dev/net/tun
+        info "创建/dev/net/tun符号链接"
+    fi
 
     if [ ! -c "/dev/net/tun" ]; then
         error "无法创建 /dev/net/tun，可能的原因："

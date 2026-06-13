@@ -1,26 +1,19 @@
 # shellcheck shell=ash
 #
-# rule-1
-#
-# 如果存在boot-completed.sh 文件
-if [ -f "${MODDIR}/boot-completed.sh" ]; then
-	# 重命名为service.sh
-	mv "${MODDIR}/boot-completed.sh" "${MODDIR}/service.sh"
-fi
+kam_magisk_prepare_installer() {
+	# Only build/package phases should call this. Runtime imports must not mutate
+	# an installed module under /data/adb/modules.
+	if [ -f "${MODDIR}/boot-completed.sh" ]; then
+		mv "${MODDIR}/boot-completed.sh" "${MODDIR}/service.sh"
+	fi
 
-# rule-2
-#
-# 如果不存在META-INF/com/google/android/update-script 文件
-if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
-	# 写入 #MAGISK
-	printf '%s\n' "#MAGISK" >"${MODDIR}/META-INF/com/google/android/update-script"
-fi
+	if [ ! -f "${MODDIR}/META-INF/com/google/android/updater-script" ]; then
+		mkdir -p "${MODDIR}/META-INF/com/google/android"
+		printf '%s\n' "#MAGISK" >"${MODDIR}/META-INF/com/google/android/updater-script"
+	fi
 
-# rule-3
-#
-# 如果不存在META-INF/com/google/android/update-binary 文件
-if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
-	# 写入
+	if [ ! -f "${MODDIR}/META-INF/com/google/android/update-binary" ]; then
+		mkdir -p "${MODDIR}/META-INF/com/google/android"
 	cat <<EOF >"${MODDIR}/META-INF/com/google/android/update-binary"
 #!/sbin/sh
 
@@ -56,7 +49,8 @@ mount /data 2>/dev/null
 install_module
 exit 0
 EOF
-fi
+	fi
+}
 
 # Magisk 管理器：安装模块的实现
 install_module() {

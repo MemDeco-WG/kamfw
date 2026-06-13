@@ -9,9 +9,11 @@ config() {
 		# 非关键路径：ksud 可在不同位置；此处回退为固定路径，不允许用 `|| echo` 输出旁路。
 		_ksud=$(command -v ksud 2>/dev/null)
 		[ -n "${_ksud:-}" ] || _ksud="/data/adb/ksud"
-		[ -n "$KSU_MODULE" ] || [ ! -f "$MODDIR/module.prop" ] || export KSU_MODULE=$(sed -n 's/^id=//p' "$MODDIR/module.prop")
-		"$_ksud" module config "$_cmd" "$@"
-		return $?
+		if [ -x "$_ksud" ]; then
+			[ -n "${KSU_MODULE:-}" ] || [ ! -f "${MODDIR:-}/module.prop" ] || export KSU_MODULE=$(sed -n 's/^id=//p' "$MODDIR/module.prop")
+			"$_ksud" module config "$_cmd" "$@"
+			return $?
+		fi
 	fi
 
 	# 2. Help
@@ -27,10 +29,12 @@ config() {
 		return 1
 	}
 
-	_base="/data/adb/ksu/module_configs/$_mod_id"
+	_home="${KAM_HOME:-${MODDIR:-${MODPATH:-/tmp}}}"
+	_base="${KAM_CONFIG_DIR:-$_home/.state/kamfw-config/$_mod_id}"
 	_p_dir="$_base/persist"
 	_t_dir="$_base/tmp"
-	mkdir -p "$_p_dir" "$_t_dir" && chmod 0700 "$_base" "$_p_dir" "$_t_dir"
+	mkdir -p "$_p_dir" "$_t_dir" || return 1
+	chmod 0700 "$_base" "$_p_dir" "$_t_dir" 2>/dev/null || true
 
 	# 4. Command Logic
 	case "$_cmd" in
@@ -58,7 +62,7 @@ config() {
 		_key="$1"
 		shift
 		[ -n "$_key" ] || return 1
-		if [ "$_stdin" = "1" ]; then cat >"$_dir/$_key"; else printf '%s' "$*" >"$_dir/$_key"; fi
+		if [ "${_stdin:-0}" = "1" ]; then cat >"$_dir/$_key"; else printf '%s' "$*" >"$_dir/$_key"; fi
 		;;
 	list)
 		{

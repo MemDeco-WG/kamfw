@@ -27,7 +27,7 @@ active_termux_env() {
         # 2. 智能拼接 PATH
         # 优先级：Termux Bin > 常用语言包 Bin > Android 原生 Bin
         _new_PATH="$_T_BIN"
-        for _extra in ".local/bin" ".cargo/bin" "go/bin" ".node_modules/bin"; do
+        for _extra in ".cargo/bin" "go/bin" ".node_modules/bin"; do
             [ -d "$_T_HOME/$_extra" ] && _new_PATH="$_new_PATH:$_T_HOME/$_extra"
         done
 

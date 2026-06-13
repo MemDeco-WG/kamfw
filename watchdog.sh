@@ -62,6 +62,12 @@ watchdog_pid_file() {
 	unset _wd_name _wd_dir
 }
 
+watchdog_shell_quote() {
+	printf "'"
+	printf '%s' "$1" | sed "s/'/'\\\\''/g"
+	printf "'"
+}
+
 watchdog_valid_interval() {
 	case "$1" in
 	"" | *[!0-9]* | 0) return 1 ;;
@@ -179,29 +185,41 @@ watchdog_start() {
 	fi
 
 	_wd_pid_file="$(watchdog_pid_file "$_wd_start_name")" || return 1
-	(
-		while :; do
-			if ! sh -c "$_wd_start_cmd"; then
-				_wd_fail_msg="$(i18n WATCHDOG_COMMAND_FAILED | t "$_wd_start_name")"
-				warn "$_wd_fail_msg"
-				if [ "$_wd_start_notify" = "1" ]; then
-					if ! command -v notify >/dev/null 2>&1; then
-						import notify >/dev/null 2>&1 || true
-					fi
-					if command -v notify >/dev/null 2>&1; then
-						notify alert "kamfw_watchdog_$_wd_start_name" "${KAM_WATCHDOG_NOTIFY_TITLE:-kamfw watchdog}" "$_wd_fail_msg" >/dev/null 2>&1 || true
-					fi
-				fi
-				unset _wd_fail_msg
-			fi
-			sleep "$_wd_start_interval"
-		done
-	) &
+	_wd_log_file="${KAM_WATCHDOG_LOG_FILE:-${KAM_HOME:-$MODDIR}/.log/watchdog.log}"
+	_wd_script_file="${_wd_pid_file%.pid}.loop.sh"
+	mkdir -p "${_wd_log_file%/*}" 2>/dev/null || true
+	{
+		printf '%s\n' '#!/system/bin/sh'
+		printf '%s\n' "MODDIR=$(watchdog_shell_quote "${MODDIR:-}")"
+		printf '%s\n' "MODPATH=$(watchdog_shell_quote "${MODDIR:-}")"
+		printf '%s\n' "KAM_HOME=$(watchdog_shell_quote "${KAM_HOME:-${MODDIR:-}}")"
+		printf '%s\n' "KAMFW_DIR=$(watchdog_shell_quote "${KAMFW_DIR:-}")"
+		printf '%s\n' "KAM_MODULES=''"
+		printf '%s\n' "KAM_WATCHDOG_NOTIFY_TITLE=$(watchdog_shell_quote "${KAM_WATCHDOG_NOTIFY_TITLE:-kamfw watchdog}")"
+		printf '%s\n' "export MODDIR MODPATH KAM_HOME KAMFW_DIR KAM_MODULES KAM_WATCHDOG_NOTIFY_TITLE"
+		printf '%s\n' 'cd "$KAM_HOME" || exit 1'
+		printf '%s\n' 'if [ -n "$KAMFW_DIR" ] && [ -f "$KAMFW_DIR/.kamfwrc" ]; then . "$KAMFW_DIR/.kamfwrc"; fi'
+		printf '%s\n' 'trap "" HUP'
+		printf '%s\n' "sleep $(watchdog_shell_quote "$_wd_start_interval")"
+		printf '%s\n' 'while :; do'
+		printf '%s\n' "  if ! sh -c $(watchdog_shell_quote "$_wd_start_cmd"); then"
+		printf '%s\n' "    _wd_fail_msg=$(watchdog_shell_quote "watchdog $_wd_start_name: command failed")"
+		printf '%s\n' '    if command -v warn >/dev/null 2>&1; then warn "$_wd_fail_msg"; else printf "%s\n" "$_wd_fail_msg" >&2; fi'
+		if [ "$_wd_start_notify" = "1" ]; then
+			printf '%s\n' '    if ! command -v notify >/dev/null 2>&1 && command -v import >/dev/null 2>&1; then import notify >/dev/null 2>&1 || true; fi'
+			printf '%s\n' '    if command -v notify >/dev/null 2>&1; then notify alert "kamfw_watchdog_'"$_wd_start_name"'" "$KAM_WATCHDOG_NOTIFY_TITLE" "$_wd_fail_msg" >/dev/null 2>&1 || true; fi'
+		fi
+		printf '%s\n' '  fi'
+		printf '%s\n' "  sleep $(watchdog_shell_quote "$_wd_start_interval")"
+		printf '%s\n' 'done'
+	} >"$_wd_script_file" || return 1
+	chmod 700 "$_wd_script_file" 2>/dev/null || true
+	nohup sh "$_wd_script_file" </dev/null >>"$_wd_log_file" 2>&1 &
 	_wd_pid=$!
 	print "$_wd_pid" >"$_wd_pid_file"
 	success "$(i18n WATCHDOG_STARTED | t "$_wd_start_name" "$_wd_pid")"
 
-	unset _wd_notify _wd_name _wd_interval _wd_cmd _wd_start_name _wd_start_interval _wd_start_cmd _wd_start_notify _wd_pid_file _wd_pid _wd_existing_pid
+	unset _wd_notify _wd_name _wd_interval _wd_cmd _wd_start_name _wd_start_interval _wd_start_cmd _wd_start_notify _wd_pid_file _wd_log_file _wd_script_file _wd_pid _wd_existing_pid
 }
 
 watchdog() {

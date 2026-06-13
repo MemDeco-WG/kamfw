@@ -6,7 +6,7 @@
 #
 ##########################################################################################
 
-export MODDIR=${MODPATH:-${1:-${0%/*}}}
+export MODDIR=${MODPATH:-${MODDIR:-${1:-${0%/*}}}}
 . "${MODDIR}/.config/kamfw/.envrc"
 if [ -d "${MODDIR}/.config/kamfw/env.d" ]; then
     for _kamfw_rcfile in "${MODDIR}/.config/kamfw/env.d/"*.envrc; do

@@ -165,8 +165,10 @@ mihomo_tun() {
 	mkdir -p /dev/net
 	info "创建/dev/net/目录"
 
-	[ ! -L /dev/net/tun ] && ln -s /dev/tun /dev/net/tun
-	info "创建/dev/net/tun符号链接"
+	if [ ! -e /dev/net/tun ]; then
+		ln -s /dev/tun /dev/net/tun
+		info "创建/dev/net/tun符号链接"
+	fi
 
 	if [ ! -c "/dev/net/tun" ]; then
 		error "无法创建 /dev/net/tun，可能的原因："
