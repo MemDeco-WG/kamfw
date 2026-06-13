@@ -1,104 +1,10 @@
 # shellcheck shell=ash
 #
 # singbox helper utilities
-# Functions to get/set the redirect URL in $MODDIR/webroot/index.html
 #
 
 import rich
 import self
-
-# Get the current document.location URL from the webroot index.
-# Usage: singbox_get_ui_redirect [index_file]
-# Prints the URL on stdout and returns 0 on success.
-singbox_get_ui_redirect() {
-    _index="${1:-${MODDIR:-${0%/*}}/webroot/index.html}"
-    if [ ! -f "$_index" ]; then
-        error "Index file not found: $_index"
-        return 1
-    fi
-    # Extract the single-quoted URL after document.location
-    awk -F"'" '/document.location/ { print $2; exit }' "$_index"
-}
-
-# Set the document.location URL in the webroot index.
-# Usage: singbox_set_ui_redirect <url> [index_file]
-# Returns 0 on success.
-singbox_set_ui_redirect() {
-    _url="$1"
-    _index="${2:-${MODDIR:-${0%/*}}/webroot/index.html}"
-    if [ -z "$_url" ]; then
-        error "Usage: singbox_set_ui_redirect <url> [index_file]"
-        return 2
-    fi
-    if [ ! -f "$_index" ]; then
-        error "Index file not found: $_index"
-        return 3
-    fi
-    if ! grep -q "document.location" "$_index"; then
-        error "No document.location found in $_index"
-        return 4
-    fi
-    # Escape potential sed metacharacters in the URL
-    _url_escaped=$(printf '%s' "$_url" | sed 's/[&]/\\&/g')
-
-    # Simple replacement (no backup, minimal complexity)
-    if sed "s|\(document.location[[:space:]]*=[[:space:]]*\)['\"][^'\"]*['\"]|\1'${_url_escaped}'|" "$_index" >"${_index}.new"; then
-        if mv -f -- "${_index}.new" "$_index"; then
-            _msg="$(i18n 'WEBROOT_REDIRECT_UPDATED' 2>/dev/null)"
-            [ -n "$_msg" ] || _msg="Webroot redirect updated to: "
-            success "${_msg}${_url}"
-            return 0
-        else
-            rm -f -- "${_index}.new" 2>/dev/null || true
-            _msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"
-            [ -n "$_msg" ] || _msg="Failed to update webroot redirect"
-            error "$_msg"
-            return 4
-        fi
-    else
-        rm -f -- "${_index}.new" 2>/dev/null || true
-        _msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"
-        [ -n "$_msg" ] || _msg="Failed to update webroot redirect"
-        error "$_msg"
-        return 5
-    fi
-}
-
-singbox_set_default() {
-    _url="http://127.0.0.1:9090/ui/"
-    singbox_set_ui_redirect "$_url"
-    unset _url
-}
-singbox_set_yacd() {
-    _url="https://yacd.metacubex.one/"
-    singbox_set_ui_redirect "$_url"
-    unset _url
-}
-
-set_i18n "SET_UI_REDIRECT" \
-    "zh" "设置 WebUI 跳转" \
-    "en" "Set WebUI redirect" \
-    "ja" "WebUI リダイレクト設定" \
-    "ko" "WebUI 리디렉션 설정"
-set_i18n "USE_DEFAULT" \
-    "zh" "使用本地默认" \
-    "en" "Use local default" \
-    "ja" "ローカルのデフォルトを使用" \
-    "ko" "로컬 기본 사용"
-set_i18n "USE_YACD" \
-    "zh" "使用 Yacd 前端" \
-    "en" "Use Yacd frontend" \
-    "ja" "Yacd フロントエンドを使用" \
-    "ko" "Yacd 프론트엔드 사용"
-
-singbox_ask_webui() {
-    ask "SET_UI_REDIRECT" \
-        "USE_DEFAULT" \
-        'singbox_set_default' \
-        "USE_YACD" \
-        'singbox_set_yacd' \
-        0
-}
 
 singbox_pids() {
     if command -v pidof >/dev/null 2>&1; then

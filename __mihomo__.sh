@@ -1,102 +1,10 @@
 # shellcheck shell=ash
 #
 # mihomo helper utilities
-# Functions to get/set the redirect URL in $MODDIR/webroot/index.html
 #
 
 import rich
 import self
-
-# Get the current document.location URL from the webroot index.
-# Usage: mihomo_get_ui_redirect [index_file]
-# Prints the URL on stdout and returns 0 on success.
-mihomo_get_ui_redirect() {
-	_index="${1:-${MODDIR:-${0%/*}}/webroot/index.html}"
-	if [ ! -f "$_index" ]; then
-		error "Index file not found: $_index"
-		return 1
-	fi
-	# Extract the single-quoted URL after document.location
-	awk -F"'" '/document.location/ { print $2; exit }' "$_index"
-}
-
-# Set the document.location URL in the webroot index.
-# Usage: mihomo_set_ui_redirect <url> [index_file]
-# Returns 0 on success.
-mihomo_set_ui_redirect() {
-	_url="$1"
-	_index="${2:-${MODDIR:-${0%/*}}/webroot/index.html}"
-	if [ -z "$_url" ]; then
-		error "Usage: mihomo_set_ui_redirect <url> [index_file]"
-		return 2
-	fi
-	if [ ! -f "$_index" ]; then
-		error "Index file not found: $_index"
-		return 3
-	fi
-	if ! grep -q "document.location" "$_index"; then
-		error "No document.location found in $_index"
-		return 4
-	fi
-	# Escape potential sed metacharacters in the URL
-	_url_escaped=$(printf '%s' "$_url" | sed 's/[&]/\\&/g')
-
-	# Simple replacement (no backup, minimal complexity)
-	if sed "s|\(document.location[[:space:]]*=[[:space:]]*\)['\"][^'\"]*['\"]|\1'${_url_escaped}'|" "$_index" >"${_index}.new"; then
-		if mv -f -- "${_index}.new" "$_index"; then
-			_msg="$(i18n 'WEBROOT_REDIRECT_UPDATED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Webroot redirect updated to: "; success "${_msg}${_url}"
-			return 0
-		else
-			rm -f -- "${_index}.new" 2>/dev/null || true
-			_msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Failed to update webroot redirect"; error "$_msg"
-			return 4
-		fi
-	else
-		rm -f -- "${_index}.new" 2>/dev/null || true
-		_msg="$(i18n 'WEBROOT_REDIRECT_FAILED' 2>/dev/null)"; [ -n "$_msg" ] || _msg="Failed to update webroot redirect"; error "$_msg"
-		return 5
-	fi
-}
-
-set_default() {
-	_url="https://metacubex.github.io/metacubexd/#/setup?hostname=127.0.0.1&port=9090&secret="
-	mihomo_set_ui_redirect "$_url"
-	unset _url
-}
-set_yacd() {
-	_url="https://yacd.metacubex.one/"
-	mihomo_set_ui_redirect "$_url"
-	unset _url
-}
-
-set_i18n "SET_UI_REDIRECT" \
-	"zh" "设置 WebUI 跳转" \
-	"en" "Set WebUI redirect" \
-	"ja" "WebUI リダイレクト設定" \
-	"ko" "WebUI 리디렉션 설정"
-set_i18n "USE_DEFAULT" \
-	"zh" "使用 MetaCubeX 外部前端" \
-	"en" "Use external MetaCubeX frontend" \
-	"ja" "外部 MetaCubeX フロントエンドを使用" \
-	"ko" "외부 MetaCubeX 프론트엔드 사용"
-set_i18n "USE_YACD" \
-	"zh" "使用 Yacd 前端" \
-	"en" "Use Yacd frontend" \
-	"ja" "Yacd フロントエンドを使用" \
-	"ko" "Yacd 프론트엔드 사용"
-
-ask_webui() {
-	# Ask the user to choose between using the local default UI or the Yacd frontend.
-	# Question key:    SET_UI_REDIRECT
-	# Option keys:     USE_DEFAULT -> runs set_default
-	#                  USE_YACD     -> runs set_yacd
-	ask "SET_UI_REDIRECT" \
-		"USE_DEFAULT" \
-		'set_default' \
-		"USE_YACD" \
-		'set_yacd' \
-		0
-}
 
 mihomo_pids() {
 	if command -v pidof >/dev/null 2>&1; then
