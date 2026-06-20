@@ -50,6 +50,30 @@ is_singbox_running() {
     fi
 }
 
+singbox_wait_ready() {
+    _tries="${MAGICNET_SINGBOX_READY_TRIES:-20}"
+    _delay="${MAGICNET_SINGBOX_READY_DELAY:-1}"
+    _try=0
+    while [ "$_try" -lt "$_tries" ]; do
+        if is_singbox_running >/dev/null 2>&1; then
+            if command -v curl >/dev/null 2>&1 &&
+                curl -sS --max-time 1 http://127.0.0.1:9090/version >/dev/null 2>&1; then
+                unset _tries _delay _try
+                return 0
+            fi
+            if command -v ss >/dev/null 2>&1 &&
+                ss -lnt 2>/dev/null | grep -Eq ':9090[[:space:]]'; then
+                unset _tries _delay _try
+                return 0
+            fi
+        fi
+        _try=$((_try + 1))
+        sleep "$_delay"
+    done
+    unset _tries _delay _try
+    return 1
+}
+
 singbox_tun() {
     mkdir -p /dev/net
     info "创建/dev/net/目录"
@@ -135,25 +159,32 @@ singbox_start() {
     singbox_prepare_route_config "$_config"
     [ -d "${MODDIR}/.log" ] || mkdir -p "${MODDIR}/.log"
 
-    info "Starting sing-box..."
-    # 使用 nohup 后台运行，并将日志重定向
-    nohup sing-box run -c "$_config" -D "$_workdir" >"$_log" 2>&1 &
+    _attempt=1
+    while [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-2}" ]; do
+        info "Starting sing-box..."
+        # 使用 nohup 后台运行，并将日志重定向
+        nohup sing-box run -c "$_config" -D "$_workdir" >"$_log" 2>&1 &
 
-    sleep 1
-
-    if is_singbox_running; then
-        success "sing-box started successfully."
-        return 0
-    else
-        error "sing-box failed to start. Check $_log for details."
-        if [ -f "$_log" ]; then
-            print "--- Log tail ---"
-            tail -n 5 "$_log"
-            print "----------------"
+        if singbox_wait_ready; then
+            success "sing-box started successfully."
+            unset _config _log _workdir _attempt
+            return 0
         fi
-        return 1
+
+        warn "sing-box did not expose Clash API on 127.0.0.1:9090; stopping partial start."
+        singbox_stop >/dev/null 2>&1 || true
+        _attempt=$((_attempt + 1))
+        [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-2}" ] && sleep 1
+    done
+
+    error "sing-box failed to start. Check $_log for details."
+    if [ -f "$_log" ]; then
+        print "--- Log tail ---"
+        tail -n 5 "$_log"
+        print "----------------"
     fi
-    unset _config _log _workdir
+    unset _config _log _workdir _attempt
+    return 1
 }
 
 singbox_stop() {

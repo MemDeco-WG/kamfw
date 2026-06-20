@@ -214,6 +214,7 @@ watchdog_start() {
 		printf '%s\n' 'done'
 	} >"$_wd_script_file" || return 1
 	chmod 700 "$_wd_script_file" 2>/dev/null || true
+	: >"$_wd_log_file" 2>/dev/null || true
 	nohup sh "$_wd_script_file" </dev/null >>"$_wd_log_file" 2>&1 &
 	_wd_pid=$!
 	print "$_wd_pid" >"$_wd_pid_file"
