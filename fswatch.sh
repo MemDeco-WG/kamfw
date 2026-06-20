@@ -229,6 +229,8 @@ fswatch_stop() {
 		_fw_pid="$(sed -n '1p' "$_fw_pid_file" 2>/dev/null)"
 		if fswatch_is_pid_alive "$_fw_pid"; then
 			kill "$_fw_pid" 2>/dev/null || true
+			sleep 1
+			fswatch_is_pid_alive "$_fw_pid" && kill -9 "$_fw_pid" 2>/dev/null || true
 			rm -f "$_fw_pid_file"
 			success "$(i18n FSWATCH_STOPPED | t "$_fw_name")"
 			unset _fw_name _fw_pid_file _fw_pid
@@ -291,6 +293,7 @@ fswatch_start() {
 	_fw_snapshot_file="$(fswatch_snapshot_file "$_fw_start_name")" || return 1
 	_fw_log_file="${KAM_FSWATCH_LOG_FILE:-${KAM_HOME:-$MODDIR}/.log/fswatch.log}"
 	_fw_script_file="${_fw_pid_file%.pid}.loop.sh"
+	pkill -f "$_fw_script_file" 2>/dev/null || true
 	mkdir -p "${_fw_log_file%/*}" 2>/dev/null || true
 	_fw_loop_name="$_fw_start_name"
 	_fw_loop_path="$_fw_start_path"
@@ -310,8 +313,10 @@ fswatch_start() {
 		printf '%s\n' "export MODDIR MODPATH KAM_HOME KAMFW_DIR KAM_MODULES KAM_FSWATCH_PRUNE_NAMES"
 		printf '%s\n' 'cd "$KAM_HOME" || exit 1'
 		printf '%s\n' 'if [ -n "$KAMFW_DIR" ] && [ -f "$KAMFW_DIR/.kamfwrc" ]; then . "$KAMFW_DIR/.kamfwrc"; import fswatch; fi'
+		printf '%s\n' 'command -v fswatch_changed >/dev/null 2>&1 || { printf "%s\n" "fswatch_changed unavailable; exiting" >&2; exit 1; }'
 		printf '%s\n' 'trap "" HUP'
 		printf '%s\n' 'while :; do'
+		printf '%s\n' '  [ ! -f "$KAM_HOME/disable" ] && [ ! -f "$KAM_HOME/remove" ] || exit 0'
 		printf '%s\n' "  if fswatch_changed $(fswatch_shell_quote "$_fw_loop_path") $(fswatch_shell_quote "$_fw_loop_snapshot_file"); then"
 		printf '%s\n' "    if command -v info >/dev/null 2>&1; then info $(fswatch_shell_quote "fswatch change detected: $_fw_loop_name"); fi"
 		printf '%s\n' "    KAM_FSWATCH_NAME=$(fswatch_shell_quote "$_fw_loop_name") KAM_FSWATCH_PATH=$(fswatch_shell_quote "$_fw_loop_path") KAM_FSWATCH_SNAPSHOT=$(fswatch_shell_quote "$_fw_loop_snapshot_file") sh -c $(fswatch_shell_quote "$_fw_loop_cmd")"

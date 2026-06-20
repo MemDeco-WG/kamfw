@@ -114,6 +114,8 @@ watchdog_stop() {
 		_wd_pid="$(sed -n '1p' "$_wd_pid_file" 2>/dev/null)"
 		if watchdog_is_pid_alive "$_wd_pid"; then
 			kill "$_wd_pid" 2>/dev/null || true
+			sleep 1
+			watchdog_is_pid_alive "$_wd_pid" && kill -9 "$_wd_pid" 2>/dev/null || true
 			rm -f "$_wd_pid_file"
 			success "$(i18n WATCHDOG_STOPPED | t "$_wd_name")"
 			unset _wd_name _wd_pid_file _wd_pid
@@ -187,6 +189,7 @@ watchdog_start() {
 	_wd_pid_file="$(watchdog_pid_file "$_wd_start_name")" || return 1
 	_wd_log_file="${KAM_WATCHDOG_LOG_FILE:-${KAM_HOME:-$MODDIR}/.log/watchdog.log}"
 	_wd_script_file="${_wd_pid_file%.pid}.loop.sh"
+	pkill -f "$_wd_script_file" 2>/dev/null || true
 	mkdir -p "${_wd_log_file%/*}" 2>/dev/null || true
 	{
 		printf '%s\n' '#!/system/bin/sh'
@@ -200,8 +203,10 @@ watchdog_start() {
 		printf '%s\n' 'cd "$KAM_HOME" || exit 1'
 		printf '%s\n' 'if [ -n "$KAMFW_DIR" ] && [ -f "$KAMFW_DIR/.kamfwrc" ]; then . "$KAMFW_DIR/.kamfwrc"; fi'
 		printf '%s\n' 'trap "" HUP'
+		printf '%s\n' '[ ! -f "$KAM_HOME/disable" ] && [ ! -f "$KAM_HOME/remove" ] || exit 0'
 		printf '%s\n' "sleep $(watchdog_shell_quote "$_wd_start_interval")"
 		printf '%s\n' 'while :; do'
+		printf '%s\n' '  [ ! -f "$KAM_HOME/disable" ] && [ ! -f "$KAM_HOME/remove" ] || exit 0'
 		printf '%s\n' "  if ! sh -c $(watchdog_shell_quote "$_wd_start_cmd"); then"
 		printf '%s\n' "    _wd_fail_msg=$(watchdog_shell_quote "watchdog $_wd_start_name: command failed")"
 		printf '%s\n' '    if command -v warn >/dev/null 2>&1; then warn "$_wd_fail_msg"; else printf "%s\n" "$_wd_fail_msg" >&2; fi'

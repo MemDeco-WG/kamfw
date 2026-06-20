@@ -53,6 +53,19 @@ script renaming for managers that do not expose every phase directly, so module
 business code should not branch on Magisk, KernelSU, APatch, or ShiroSU for
 lifecycle compatibility.
 
+`uninstall` is optional. Do not ship an `uninstall.sh` just to import
+`__uninstall__`; the default cleanup phase is quiet. Ship one only when the
+module has real uninstall work, and make it call:
+
+```sh
+. "$MODDIR/lib/kamfw/.kamfwrc"
+import __runtime__
+kamfw run uninstall -- "$@"
+```
+
+For property rollback, use `import prop` and `persistprop`; it creates
+`$MODPATH/uninstall.sh` lazily with the exact rollback commands needed.
+
 ## Installer
 
 `import __installer__` is the complete public installer entrypoint. It loads:

@@ -70,33 +70,50 @@ set_i18n "RESETPROP_HEXPATCH_OK" \
 	"en" "Hexpatch successfully applied for property: \\$_1"
 
 # -----------------------------------------------------------------------------
-# Append a command to <modpath>/uninstall.sh if not already present
+# Return the uninstall script path for a module directory.
+# -----------------------------------------------------------------------------
+kamfw_uninstall_script_path() {
+	_kamfw_uninstall_mp="${1:-${MODPATH:-}}"
+	[ -n "$_kamfw_uninstall_mp" ] || return 1
+	printf '%s\n' "$_kamfw_uninstall_mp/uninstall.sh"
+	unset _kamfw_uninstall_mp
+}
+
+kamfw_ensure_uninstall_script() {
+	_kamfw_uninstall_mp="${1:-${MODPATH:-}}"
+	[ -n "$_kamfw_uninstall_mp" ] || {
+		warn "$(i18n 'PERSISTPROP_NO_MODPATH' 2>/dev/null || echo 'MODPATH not set')"
+		return 1
+	}
+
+	_kamfw_uninstall_script="$(kamfw_uninstall_script_path "$_kamfw_uninstall_mp")" || return 1
+	if [ ! -f "$_kamfw_uninstall_script" ]; then
+		printf '%s\n' "#!/system/bin/sh" >"$_kamfw_uninstall_script" || return 1
+		chmod 755 "$_kamfw_uninstall_script" 2>/dev/null || true
+		info "$(i18n 'UNINSTALL_SCRIPT_CREATED' 2>/dev/null | t "$_kamfw_uninstall_script" 2>/dev/null || printf 'Created uninstall: %s' "$_kamfw_uninstall_script")"
+	fi
+	unset _kamfw_uninstall_mp _kamfw_uninstall_script
+}
+
+# Append a command to <modpath>/uninstall.sh if not already present.
 # -----------------------------------------------------------------------------
 register_uninstall_cmd() {
 	_cmd="$1"
 	_mp="${2:-${MODPATH:-}}"
 
 	[ -n "$_cmd" ] || return 0
-	[ -n "$_mp" ] || {
-		warn "$(i18n 'PERSISTPROP_NO_MODPATH' 2>/dev/null || echo 'MODPATH not set')"
-		return 1
-	}
-
-	_un="$(_mp)/uninstall.sh"
-	if [ ! -f "$_un" ]; then
-		# create a basic uninstall script header
-		printf '%s\n' "#!/sbin/sh" >"$_un" || { warn "$(i18n 'UNINSTALL_SCRIPT_CREATED' 2>/dev/null | t "$_un" 2>/dev/null || printf 'Created uninstall: %s' "$_un")"; }
-		chmod 755 "$_un" 2>/dev/null || true
-		info "$(i18n 'UNINSTALL_SCRIPT_CREATED' 2>/dev/null | t "$_un" 2>/dev/null || printf 'Created uninstall: %s' "$_un")"
-	fi
+	kamfw_ensure_uninstall_script "$_mp" || return 1
+	_un="$(kamfw_uninstall_script_path "$_mp")" || return 1
 
 	# Deduplicate lines (literal match)
 	if grep -F -- "$_cmd" "$_un" >/dev/null 2>&1; then
+		unset _cmd _mp _un
 		return 0
 	fi
 
 	printf '%s\n' "$_cmd" >>"$_un" || return 1
 	info "$(i18n 'UNINSTALL_CMD_ADDED' 2>/dev/null | t "$_cmd" 2>/dev/null || printf 'Added uninstall command: %s' "$_cmd")"
+	unset _cmd _mp _un
 	return 0
 }
 
@@ -131,15 +148,11 @@ persistprop() {
 
 	_cur="$(resetprop "$_name" 2>/dev/null || true)"
 
-	# Ensure uninstall exists and is executable
-	if [ ! -f "$_mp/uninstall.sh" ]; then
-		printf '%s\n' "#!/sbin/sh" >"$_mp/uninstall.sh" || true
-		chmod 755 "$_mp/uninstall.sh" 2>/dev/null || true
-		info "$(i18n 'UNINSTALL_SCRIPT_CREATED' 2>/dev/null | t "$_mp/uninstall.sh" 2>/dev/null || printf 'Created uninstall: %s' "$_mp/uninstall.sh")"
-	fi
+	kamfw_ensure_uninstall_script "$_mp" || return 1
+	_un="$(kamfw_uninstall_script_path "$_mp")" || return 1
 
 	# Avoid duplicating rollback entries
-	if ! grep -F -- "$_name" "$_mp/uninstall.sh" >/dev/null 2>&1; then
+	if ! grep -F -- "$_name" "$_un" >/dev/null 2>&1; then
 		if [ -n "$_cur" ]; then
 			# Record how to restore the previous value
 			_cmd="resetprop -n -p \"$_name\" \"$_cur\""
@@ -154,6 +167,7 @@ persistprop() {
 	# Now set the property
 	resetprop -n -p "$_name" "$_new" 2>/dev/null || true
 	info "$(i18n 'PERSISTPROP_SET' 2>/dev/null | t "$_name" 2>/dev/null || printf 'Set property: %s' "$_name")"
+	unset _name _new _mp _cur _cmd _un
 	return 0
 }
 

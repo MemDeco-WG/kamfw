@@ -54,11 +54,15 @@ kamfw_init_paths() {
 # 入口脚本应调用：kamfw run <phase> -- "$@"
 # -----------------------------
 kamfw() {
-    _cmd="$1"; shift
+    _cmd="${1:-help}"
+    [ $# -gt 0 ] && shift
 
     case "$_cmd" in
         run)
             kamfw_run "$@"
+            ;;
+        help|-h|--help)
+            printf '%s\n' "Usage: kamfw run <phase> -- [args...]"
             ;;
         *)
             # 兼容未来扩展
@@ -72,7 +76,12 @@ kamfw() {
 }
 
 kamfw_run() {
-    _phase="$1"; shift
+    _phase="${1:-}"
+    [ -n "$_phase" ] || {
+        error "Missing phase" || abort "Missing phase"
+        return 2
+    }
+    shift
 
     # 允许：kamfw run <phase> -- <args>
     if [ "${1:-}" = "--" ]; then

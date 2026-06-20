@@ -110,33 +110,40 @@ singbox_prepare_route_config() {
     _singbox_route_config="$1"
     [ -f "$_singbox_route_config" ] || return 0
     _iface=$(singbox_default_interface)
-    [ -n "$_iface" ] || return 0
 
     _tmp="${_singbox_route_config}.route.new"
-    awk -v iface="$_iface" '
+    awk '
         BEGIN {
             in_route = 0
-            has_default_interface = 0
         }
         /^[[:space:]]*"route"[[:space:]]*:/ {
             in_route = 1
         }
         in_route && /^[[:space:]]*"default_interface"[[:space:]]*:/ {
-            print "    \"default_interface\": \"" iface "\","
-            has_default_interface = 1
             next
         }
         in_route && /^[[:space:]]*"auto_detect_interface"[[:space:]]*:/ {
             print "    \"auto_detect_interface\": false,"
             next
         }
-        in_route && !has_default_interface && /^[[:space:]]*"default_domain_resolver"[[:space:]]*:/ {
-            print "    \"default_interface\": \"" iface "\","
-            has_default_interface = 1
-        }
         { print }
     ' "$_singbox_route_config" >"$_tmp" && mv -f "$_tmp" "$_singbox_route_config" || rm -f "$_tmp"
-    unset _singbox_route_config _iface _tmp
+
+    if [ -n "$_iface" ]; then
+        _jq="${MODDIR}/bin/jq"
+        if [ ! -x "$_jq" ]; then
+            _jq="$(command -v jq 2>/dev/null || true)"
+        fi
+        if [ -n "$_jq" ]; then
+            _tmp="${_singbox_route_config}.direct-iface.new"
+            "$_jq" --arg iface "$_iface" '
+                .outbounds = ((.outbounds // []) | map(
+                    if (.type // "") == "direct" then .bind_interface = $iface else . end
+                ))
+            ' "$_singbox_route_config" >"$_tmp" && mv -f "$_tmp" "$_singbox_route_config" || rm -f "$_tmp"
+        fi
+    fi
+    unset _singbox_route_config _iface _jq _tmp
 }
 
 singbox_start() {
