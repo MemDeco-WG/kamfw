@@ -51,7 +51,7 @@ is_singbox_running() {
 }
 
 singbox_wait_ready() {
-    _tries="${MAGICNET_SINGBOX_READY_TRIES:-20}"
+    _tries="${MAGICNET_SINGBOX_READY_TRIES:-30}"
     _delay="${MAGICNET_SINGBOX_READY_DELAY:-1}"
     _try=0
     while [ "$_try" -lt "$_tries" ]; do
