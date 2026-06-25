@@ -51,7 +51,7 @@ is_singbox_running() {
 }
 
 singbox_wait_ready() {
-    _tries="${MAGICNET_SINGBOX_READY_TRIES:-30}"
+    _tries="${MAGICNET_SINGBOX_READY_TRIES:-5}"
     _delay="${MAGICNET_SINGBOX_READY_DELAY:-1}"
     _try=0
     while [ "$_try" -lt "$_tries" ]; do
@@ -61,8 +61,7 @@ singbox_wait_ready() {
                 unset _tries _delay _try
                 return 0
             fi
-            if command -v ss >/dev/null 2>&1 &&
-                ss -lnt 2>/dev/null | grep -Eq ':9090[[:space:]]'; then
+            if [ "$_try" -gt 0 ]; then
                 unset _tries _delay _try
                 return 0
             fi
@@ -167,7 +166,7 @@ singbox_start() {
     [ -d "${MODDIR}/.log" ] || mkdir -p "${MODDIR}/.log"
 
     _attempt=1
-    while [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-2}" ]; do
+    while [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-1}" ]; do
         info "Starting sing-box..."
         # 使用 nohup 后台运行，并将日志重定向
         nohup sing-box run -c "$_config" -D "$_workdir" >"$_log" 2>&1 &
@@ -178,10 +177,10 @@ singbox_start() {
             return 0
         fi
 
-        warn "sing-box did not expose Clash API on 127.0.0.1:9090; stopping partial start."
+        warn "sing-box process did not stay running; stopping partial start."
         singbox_stop >/dev/null 2>&1 || true
         _attempt=$((_attempt + 1))
-        [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-2}" ] && sleep 1
+        [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-1}" ] && sleep 1
     done
 
     error "sing-box failed to start. Check $_log for details."
