@@ -10,8 +10,8 @@
 #
 # Notes:
 # - Persists choice to "${KAM_LANG_FILE}" as `export KAM_LANG="..."`.
-# - Tries to set system property `persist.sys.locale` via `resetprop -w` or
-#   `setprop` when available (best-effort).
+# - Persists only the KAM UI language by default. Set KAM_LANG_SET_SYSTEM=1 to
+#   also try updating Android's system locale.
 # - Uses the existing `i18n` + `ask` helpers for localized menu and input.
 #
 
@@ -59,6 +59,7 @@ _lang_persist() {
 
 # Best-effort setprop/resetprop for system locale
 _lang_setprop() {
+    [ "${KAM_LANG_SET_SYSTEM:-0}" = "1" ] || return 0
     _lang="$1"
     if command -v resetprop >/dev/null 2>&1; then
         resetprop -w persist.sys.locale "$_lang" >/dev/null 2>&1 || true
