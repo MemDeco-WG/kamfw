@@ -131,12 +131,43 @@ singbox_prepare_route_config() {
                 print previous
             }
         }
+        function count_structural_brace(text, target,    i, char, escaped, quoted, count) {
+            for (i = 1; i <= length(text); i++) {
+                char = substr(text, i, 1)
+                if (quoted) {
+                    if (escaped) {
+                        escaped = 0
+                    } else if (char == "\\") {
+                        escaped = 1
+                    } else if (char == "\"") {
+                        quoted = 0
+                    }
+                } else if (char == "\"") {
+                    quoted = 1
+                } else if (char == target) {
+                    count++
+                }
+            }
+            return count
+        }
         {
             current = $0
+            open_count = count_structural_brace(current, "{")
+            for (i = 1; i <= open_count; i++) {
+                object_depth++
+                object_type[object_depth] = ""
+            }
+            if (current ~ /^[[:space:]]*"type"[[:space:]]*:/) {
+                current_type = current
+                sub(/^.*"type"[[:space:]]*:[[:space:]]*"/, "", current_type)
+                sub(/".*/, "", current_type)
+                object_type[object_depth] = current_type
+            }
             if (current ~ /^[[:space:]]*"auto_detect_interface"[[:space:]]*:/) {
                 sub(/:[[:space:]]*(true|false)/, ": true", current)
             }
-            if (current ~ /^[[:space:]]*"interrupt_exist_connections"[[:space:]]*:/) {
+            if (object_type[object_depth] == "selector" &&
+                current ~ /^[[:space:]]*"interrupt_exist_connections"[[:space:]]*:/) {
                 sub(/:[[:space:]]*(true|false)/, ": true", current)
             }
             if (current ~ /^[[:space:]]*"(default_interface|bind_interface)"[[:space:]]*:/) {
@@ -148,6 +179,11 @@ singbox_prepare_route_config() {
             flush_previous()
             previous = current
             have_previous = 1
+            close_count = count_structural_brace(current, "}")
+            for (i = 1; i <= close_count; i++) {
+                delete object_type[object_depth]
+                object_depth--
+            }
         }
         END {
             flush_previous()
