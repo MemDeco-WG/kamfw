@@ -2,8 +2,6 @@
 # __runtime__.sh
 # 统一生命周期运行时：负责 KAM_HOME 初始化、PATH/LD_LIBRARY_PATH、以及 phase 调度
 
-import __termux__
-
 # -----------------------------
 # KAM_HOME / HOME 初始化
 # Lead 定案：KAM_HOME = $MODDIR
@@ -32,21 +30,13 @@ kamfw_init_home() {
 }
 
 # -----------------------------
-# Termux 环境（若可用则激活）
-# -----------------------------
-kamfw_init_termux() {
-    # __termux__ 内部可能会判断环境；这里保持调用幂等
-    active_termux_env
-}
-
-# -----------------------------
 # PATH / LD_LIBRARY_PATH
 # -----------------------------
 kamfw_init_paths() {
-    # 优先模块自带 bin，再补齐 root manager 与系统常用路径
-    export PATH="$MODDIR/bin:/data/adb/magisk:/data/adb/ksu/bin:/system/bin:/system/xbin:/sbin:$PATH"
+    # Fixed root-safe paths only: never inherit an app-owned Termux PATH.
+    export PATH="$MODDIR/bin:/data/adb/magisk:/data/adb/ksu/bin:/system/bin:/system/xbin:/sbin"
 
-    export LD_LIBRARY_PATH="$MODDIR/lib:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="$MODDIR/lib"
 }
 
 # -----------------------------
@@ -89,7 +79,6 @@ kamfw_run() {
     fi
 
     kamfw_init_home
-    kamfw_init_termux
     kamfw_init_paths
 
     # Phase route: shell handlers are the runtime source of truth.

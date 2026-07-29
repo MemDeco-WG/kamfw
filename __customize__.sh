@@ -1,15 +1,15 @@
 # shellcheck shell=ash
-# Minimal customize shim: termux env, module perms, and installer helper import
+# Minimal customize shim: root-safe module env, module perms, and installer helper import
 # Keep this file tiny — heavy lifting lives in src/MagicNet/lib/kamfw/__installer__.sh
 
-import __termux__
 import __at_exit__   # provides install-on-exit handler
 import __installer__ # compact installer API (install/include/exclude/check/run/schedule)
 
-active_termux_env
-
-export PATH="$MODDIR/bin:$PATH"
-export LD_LIBRARY_PATH="$MODDIR/lib:$LD_LIBRARY_PATH"
+# Root lifecycle must not inherit executable or library search paths from an
+# app-owned Termux environment. Keep the installer harness and MagicNet files
+# available through a fixed module/system-only environment.
+export PATH="$MODDIR/bin:/data/adb/magisk:/data/adb/ksu/bin:/system/bin:/system/xbin:/sbin"
+export LD_LIBRARY_PATH="$MODDIR/lib"
 
 # i18n for permission messages (user-visible)
 set_i18n "SET_PERM_BINARIES" "zh" "设置本地可执行文件权限" "en" "Setting permissions for local binaries"
