@@ -103,7 +103,7 @@ singbox_prepare_route_config() {
         _tmp="${_singbox_route_config}.route.new"
         if "$_jq" '
             .route = ((.route // {})
-                | .auto_detect_interface = true
+                | .auto_detect_interface = false
                 | del(.default_interface))
             | .outbounds = ((.outbounds // []) | map(
                 if (.type // "") == "direct" then
@@ -123,7 +123,7 @@ singbox_prepare_route_config() {
     fi
 
     # Last-resort text fallback for minimal Android environments without jq.
-    # It never freezes routing to the currently active physical interface.
+    # Without jq, keep routing delegated to Android rather than retaining a stale interface.
     _tmp="${_singbox_route_config}.route.new"
     awk '
         function flush_previous() {
@@ -164,7 +164,7 @@ singbox_prepare_route_config() {
                 object_type[object_depth] = current_type
             }
             if (current ~ /^[[:space:]]*"auto_detect_interface"[[:space:]]*:/) {
-                sub(/:[[:space:]]*(true|false)/, ": true", current)
+                sub(/:[[:space:]]*(true|false)/, ": false", current)
             }
             if (object_type[object_depth] == "selector" &&
                 current ~ /^[[:space:]]*"interrupt_exist_connections"[[:space:]]*:/) {
