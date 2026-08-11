@@ -115,9 +115,10 @@ singbox_prepare_route_config() {
                 end
             ))
         ' "$_singbox_route_config" >"$_tmp"; then
-            mv -f "$_tmp" "$_singbox_route_config"
-            unset _singbox_route_config _jq _tmp
-            return 0
+            if mv -f "$_tmp" "$_singbox_route_config"; then
+                unset _singbox_route_config _jq _tmp
+                return 0
+            fi
         fi
         rm -f "$_tmp"
     fi
@@ -125,7 +126,8 @@ singbox_prepare_route_config() {
     # Last-resort text fallback for minimal Android environments without jq.
     # Without jq, keep routing delegated to Android rather than retaining a stale interface.
     _tmp="${_singbox_route_config}.route.new"
-    awk '
+    _route_rc=1
+    if awk '
         function flush_previous() {
             if (have_previous) {
                 print previous
@@ -188,8 +190,14 @@ singbox_prepare_route_config() {
         END {
             flush_previous()
         }
-    ' "$_singbox_route_config" >"$_tmp" && mv -f "$_tmp" "$_singbox_route_config" || rm -f "$_tmp"
+    ' "$_singbox_route_config" >"$_tmp" &&
+        mv -f "$_tmp" "$_singbox_route_config"; then
+        _route_rc=0
+    else
+        rm -f "$_tmp"
+    fi
     unset _singbox_route_config _jq _tmp
+    return "$_route_rc"
 }
 
 singbox_start() {
