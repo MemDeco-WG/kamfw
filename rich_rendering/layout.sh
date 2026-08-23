@@ -26,17 +26,21 @@ __rich_repeat() {
     esac
 
     if command -v awk >/dev/null 2>&1; then
+        # Android toybox awk measures UTF-8 strings in bytes. Repeating and
+        # truncating by length() can therefore cut a box-drawing character in
+        # half and emit invalid UTF-8. Count repetitions instead of bytes.
         awk -v ch="${_rich_char}" -v w="${_rich_width}" 'BEGIN {
-            s = "";
-            while (length(s) < w) s = s ch;
-            if (length(s) > w) s = substr(s, 1, w);
-            printf "%s", s;
+            for (i = 0; i < w; i++) printf "%s", ch;
         }'
     else
-        printf "%${_rich_width}s" "" | tr ' ' "${_rich_char}"
+        _rich_index=0
+        while [ "$_rich_index" -lt "$_rich_width" ]; do
+            printf '%s' "$_rich_char"
+            _rich_index=$((_rich_index + 1))
+        done
     fi
 
-    unset _rich_char _rich_width
+    unset _rich_char _rich_width _rich_index
 }
 
 __rich_pad_right() {
