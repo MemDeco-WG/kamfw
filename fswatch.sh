@@ -120,7 +120,9 @@ fswatch_valid_name() {
 fswatch_is_pid_alive() {
 	_fw_pid="$1"
 	[ -n "$_fw_pid" ] || return 1
-	kill -0 "$_fw_pid" 2>/dev/null
+	if kill -0 "$_fw_pid" 2>/dev/null; then return 0; fi
+	[ -d "/proc/$_fw_pid" ] && return 2
+	return 1
 }
 
 fswatch_proc_cmdline_lines() (
@@ -131,7 +133,7 @@ fswatch_proc_cmdline_lines() (
 	fi
 	_fw_module_root="${MODDIR:-${KAM_HOME:-}}"
 	_fw_reader="${_fw_module_root}/cli"
-	[ -x "$_fw_reader" ] || return 1
+	[ -x "$_fw_reader" ] || return 2
 	"$_fw_reader" __proc-cmdline /proc "$_fw_pid"
 )
 
@@ -143,16 +145,17 @@ fswatch_proc_stat_identity() (
 	fi
 	_fw_module_root="${MODDIR:-${KAM_HOME:-}}"
 	_fw_reader="${_fw_module_root}/cli"
-	[ -x "$_fw_reader" ] || return 1
+	[ -x "$_fw_reader" ] || return 2
 	"$_fw_reader" __proc-stat /proc "$_fw_pid"
 )
 
 fswatch_pid_matches_script() (
 	_fw_pid="$1"
 	_fw_script_file="$2"
-	fswatch_is_pid_alive "$_fw_pid" || return 1
-	[ -r "/proc/$_fw_pid/cmdline" ] || return 1
-	_fw_cmdline=$(fswatch_proc_cmdline_lines "$_fw_pid") || return 1
+	if fswatch_is_pid_alive "$_fw_pid"; then _fw_alive_rc=0; else _fw_alive_rc=$?; fi
+	[ "$_fw_alive_rc" -eq 0 ] || return "$_fw_alive_rc"
+	if _fw_cmdline=$(fswatch_proc_cmdline_lines "$_fw_pid"); then _fw_read_rc=0; else _fw_read_rc=$?; fi
+	[ "$_fw_read_rc" -eq 0 ] || return "$_fw_read_rc"
 	_fw_argv0=''
 	_fw_argv1=''
 	_fw_index=0
@@ -177,31 +180,46 @@ EOF
 fswatch_stop_pid_for_script() (
 	_fw_pid="$1"
 	_fw_script_file="$2"
-	fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file" || {
-		unset _fw_pid _fw_script_file
-		return 1
-	}
+	if fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file"; then _fw_rc=0; else _fw_rc=$?; fi
+	[ "$_fw_rc" -eq 0 ] || return "$_fw_rc"
 	kill "$_fw_pid" 2>/dev/null || true
 	sleep 1
-	fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file" && kill -9 "$_fw_pid" 2>/dev/null || true
-	unset _fw_pid _fw_script_file
+	if fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file"; then
+		kill -9 "$_fw_pid" 2>/dev/null || true
+		sleep 1
+		fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file" && return 1
+		_fw_rc=$?
+		[ "$_fw_rc" -ne 2 ] || return 2
+	else
+		_fw_rc=$?
+		[ "$_fw_rc" -ne 2 ] || return 2
+	fi
 	return 0
 )
 
 fswatch_stop_script_processes() (
 	_fw_script_file="$1"
-	_fw_stopped=1
-	for _fw_proc_dir in /proc/[0-9]*; do
-		[ -d "$_fw_proc_dir" ] || continue
-		_fw_pid="${_fw_proc_dir##*/}"
+	if _fw_ps=$(ps -A -o pid=,args= 2>/dev/null); then _fw_rc=0; else _fw_rc=$?; fi
+	[ "$_fw_rc" -eq 0 ] || return 2
+	_fw_candidates=$(printf '%s\n' "$_fw_ps" | awk -v expected="$_fw_script_file" 'index($0, expected) { print $1 }')
+	_fw_pids=''
+	_fw_count=0
+	for _fw_pid in $_fw_candidates; do
+		_fw_count=$((_fw_count + 1))
+		[ "$_fw_count" -le 256 ] || return 2
 		if fswatch_pid_matches_script "$_fw_pid" "$_fw_script_file"; then
-			fswatch_stop_pid_for_script "$_fw_pid" "$_fw_script_file" || true
-			_fw_stopped=0
+			_fw_pids="${_fw_pids}${_fw_pids:+
+}${_fw_pid}"
+		else
+			_fw_rc=$?
+			[ "$_fw_rc" -ne 2 ] || return 2
 		fi
 	done
-	_fw_rc="$_fw_stopped"
-	unset _fw_script_file _fw_stopped _fw_read_d_supported _fw_proc_dir _fw_pid
-	return "$_fw_rc"
+	[ -n "$_fw_pids" ] || return 1
+	for _fw_pid in $_fw_pids; do
+		fswatch_stop_pid_for_script "$_fw_pid" "$_fw_script_file" || return $?
+	done
+	return 0
 )
 
 fswatch_lifecycle_lock_file() (
@@ -214,7 +232,8 @@ fswatch_lifecycle_lock_file() (
 
 fswatch_process_start_time() (
 	_fw_pid="$1"
-	_fw_identity=$(fswatch_proc_stat_identity "$_fw_pid") || return 1
+	if _fw_identity=$(fswatch_proc_stat_identity "$_fw_pid"); then _fw_rc=0; else _fw_rc=$?; fi
+	[ "$_fw_rc" -eq 0 ] || return "$_fw_rc"
 	_fw_start=${_fw_identity#* }
 	case "$_fw_start" in '' | *[!0-9]*) return 1 ;; esac
 	print "$_fw_start"
@@ -312,7 +331,8 @@ fswatch_close_inherited_lock_fds() {
 fswatch_pid_has_start_time() (
 	_fw_pid="$1"
 	_fw_expected_start="$2"
-	_fw_actual_start="$(fswatch_process_start_time "$_fw_pid")" || return 1
+	if _fw_actual_start=$(fswatch_process_start_time "$_fw_pid"); then _fw_rc=0; else _fw_rc=$?; fi
+	[ "$_fw_rc" -eq 0 ] || return "$_fw_rc"
 	[ "$_fw_actual_start" = "$_fw_expected_start" ]
 )
 
@@ -436,7 +456,10 @@ fswatch_status() {
 			print "$_fw_pid"
 			unset _fw_name _fw_pid_file _fw_script_file _fw_pid
 			return 0
+		else
+			_fw_match_rc=$?
 		fi
+		[ "$_fw_match_rc" -ne 2 ] || return 2
 		rm -f "$_fw_pid_file" 2>/dev/null || true
 	fi
 
@@ -449,26 +472,10 @@ fswatch_stop_unlocked() (
 	[ "${KAM_FSWATCH_LOCK_HELD:-0}" = "1" ] || return 1
 	_fw_pid_file="$(fswatch_pid_file "$_fw_name")" || return 1
 	_fw_script_file="$(fswatch_loop_script_file "$_fw_name")" || return 1
-	_fw_stopped=1
-	if [ -f "$_fw_pid_file" ]; then
-		_fw_pid="$(sed -n '1p' "$_fw_pid_file" 2>/dev/null)"
-		if fswatch_stop_pid_for_script "$_fw_pid" "$_fw_script_file"; then
-			_fw_stopped=0
-		fi
-	fi
-	if fswatch_stop_script_processes "$_fw_script_file"; then
-		_fw_stopped=0
-	fi
-	rm -f "$_fw_pid_file" 2>/dev/null || true
-
-	if [ "$_fw_stopped" -eq 0 ]; then
-		success "$(i18n FSWATCH_STOPPED | t "$_fw_name")"
-		_fw_rc=0
-	else
-		warn "$(i18n FSWATCH_NOT_RUNNING | t "$_fw_name")"
-		_fw_rc=1
-	fi
-	unset _fw_name _fw_pid_file _fw_script_file _fw_pid _fw_stopped
+	if fswatch_stop_script_processes "$_fw_script_file"; then _fw_rc=0; else _fw_rc=$?; fi
+	[ "$_fw_rc" -ne 2 ] || return 2
+	rm -f "$_fw_pid_file" 2>/dev/null || return 1
+	if [ "$_fw_rc" -eq 0 ]; then success "$(i18n FSWATCH_STOPPED | t "$_fw_name")"; else warn "$(i18n FSWATCH_NOT_RUNNING | t "$_fw_name")"; fi
 	return "$_fw_rc"
 )
 
@@ -536,8 +543,9 @@ fswatch_start_unlocked() {
 	_fw_script_file="$(fswatch_loop_script_file "$_fw_start_name")" || {
 		return 1
 	}
-	fswatch_stop_script_processes "$_fw_script_file" >/dev/null 2>&1 || true
-	rm -f "$_fw_pid_file" 2>/dev/null || true
+	if fswatch_stop_script_processes "$_fw_script_file" >/dev/null 2>&1; then _fw_existing_rc=0; else _fw_existing_rc=$?; fi
+	[ "$_fw_existing_rc" -ne 2 ] || return 2
+	rm -f "$_fw_pid_file" 2>/dev/null || return 1
 	mkdir -p "${_fw_log_file%/*}" 2>/dev/null || true
 	_fw_loop_name="$_fw_start_name"
 	_fw_loop_path="$_fw_start_path"
