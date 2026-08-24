@@ -340,7 +340,7 @@ fswatch_path_is_pruned() {
 	_fw_prune_path="$1"
 	for _fw_prune_name in ${KAM_FSWATCH_PRUNE_NAMES:-}; do
 		case "$_fw_prune_path" in
-		*/"$_fw_prune_name"|*/"$_fw_prune_name"/*)
+		*/"$_fw_prune_name" | */"$_fw_prune_name"/*)
 			unset _fw_prune_path _fw_prune_name
 			return 0
 			;;
