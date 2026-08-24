@@ -7,22 +7,22 @@ import rich
 import self
 
 singbox_pids() {
-    if command -v pidof >/dev/null 2>&1; then
-        pidof sing-box 2>/dev/null | tr ' ' '\n'
-        _pidof_rc=$?
-        [ "$_pidof_rc" -eq 0 ] && {
-            unset _pidof_rc
-            return 0
-        }
+    # Host-only compatibility; packaged Android modules always use the bounded
+    # Rust lookup below and never fall back to an N-entry /proc scan.
+    if [ ! -x /system/bin/getprop ] && command -v pidof >/dev/null 2>&1; then
+        _pidof_output=$(pidof sing-box 2>/dev/null) || return 0
+        for _pid in $_pidof_output; do
+            case "$_pid" in '' | *[!0-9]*) continue ;; esac
+            printf '%s\n' "$_pid"
+        done
+        unset _pidof_output _pid
+        return 0
     fi
-    for _proc_comm in /proc/[0-9]*/comm; do
-        [ -r "$_proc_comm" ] || continue
-        if [ "$(cat "$_proc_comm" 2>/dev/null)" = "sing-box" ]; then
-            _pid=${_proc_comm#/proc/}
-            printf '%s\n' "${_pid%/comm}"
-        fi
-    done
-    unset _pidof_rc _proc_comm _pid
+    if [ -x "${MODDIR}/cli" ]; then
+        "${MODDIR}/cli" __proc-pids sing-box 2>/dev/null
+        return $?
+    fi
+    return 1
 }
 
 singbox_set_status_description() {

@@ -123,94 +123,55 @@ fswatch_is_pid_alive() {
 	kill -0 "$_fw_pid" 2>/dev/null
 }
 
-fswatch_read_d_supported() (
-	# shellcheck disable=SC3045 # Capability probe is isolated for POSIX shells.
-	IFS= read -r -d '' _fw_probe </dev/null 2>/dev/null
-	[ "$?" -eq 1 ]
+fswatch_proc_cmdline_lines() (
+	_fw_pid="$1"
+	if type magicnet_proc_cmdline_lines >/dev/null 2>&1; then
+		magicnet_proc_cmdline_lines "$_fw_pid" /proc
+		return $?
+	fi
+	_fw_module_root="${MODDIR:-${KAM_HOME:-}}"
+	_fw_reader="${_fw_module_root}/cli"
+	[ -x "$_fw_reader" ] || return 1
+	"$_fw_reader" __proc-cmdline /proc "$_fw_pid"
+)
+
+fswatch_proc_stat_identity() (
+	_fw_pid="$1"
+	if type magicnet_proc_stat_identity >/dev/null 2>&1; then
+		magicnet_proc_stat_identity "$_fw_pid" /proc
+		return $?
+	fi
+	_fw_module_root="${MODDIR:-${KAM_HOME:-}}"
+	_fw_reader="${_fw_module_root}/cli"
+	[ -x "$_fw_reader" ] || return 1
+	"$_fw_reader" __proc-stat /proc "$_fw_pid"
 )
 
 fswatch_pid_matches_script() (
 	_fw_pid="$1"
 	_fw_script_file="$2"
-	fswatch_is_pid_alive "$_fw_pid" || {
-		unset _fw_pid _fw_script_file
-		return 1
-	}
-	[ -r "/proc/$_fw_pid/cmdline" ] || {
-		unset _fw_pid _fw_script_file
-		return 1
-	}
-	_fw_use_read_d="${_fw_read_d_supported:-}"
-	if [ -z "$_fw_use_read_d" ]; then
-		if fswatch_read_d_supported; then
-			_fw_use_read_d=1
-		else
-			_fw_use_read_d=0
-		fi
-	fi
-	if [ "$_fw_use_read_d" -eq 1 ]; then
-		exec 3<"/proc/$_fw_pid/cmdline" || return 1
-		# shellcheck disable=SC3045 # Guarded by fswatch_read_d_supported.
-		if ! IFS= read -r -d '' _fw_argv0 <&3 2>/dev/null; then
-			exec 3<&-
-			unset _fw_pid _fw_script_file _fw_use_read_d _fw_argv0
-			return 1
-		fi
-		# shellcheck disable=SC3045 # Guarded by fswatch_read_d_supported.
-		if ! IFS= read -r -d '' _fw_argv1 <&3 2>/dev/null; then
-			exec 3<&-
-			unset _fw_pid _fw_script_file _fw_use_read_d _fw_argv0 _fw_argv1
-			return 1
-		fi
-		# shellcheck disable=SC3045 # Guarded by fswatch_read_d_supported.
-		if IFS= read -r -d '' _fw_argv2 <&3 2>/dev/null; then
-			exec 3<&-
-			unset _fw_pid _fw_script_file _fw_use_read_d _fw_argv0 _fw_argv1 _fw_argv2
-			return 1
-		fi
-		exec 3<&-
-		case "${_fw_argv0##*/}" in
-		sh | ash | dash | bash | ksh | mksh) ;;
-		*)
-			unset _fw_pid _fw_script_file _fw_use_read_d _fw_argv0 _fw_argv1 _fw_argv2
-			return 1
-			;;
+	fswatch_is_pid_alive "$_fw_pid" || return 1
+	[ -r "/proc/$_fw_pid/cmdline" ] || return 1
+	_fw_cmdline=$(fswatch_proc_cmdline_lines "$_fw_pid") || return 1
+	_fw_argv0=''
+	_fw_argv1=''
+	_fw_index=0
+	while IFS= read -r _fw_argument || [ -n "$_fw_argument" ]; do
+		_fw_index=$((_fw_index + 1))
+		case "$_fw_index" in
+		1) _fw_argv0="$_fw_argument" ;;
+		2) _fw_argv1="$_fw_argument" ;;
+		*) return 1 ;;
 		esac
-		[ "$_fw_argv1" = "$_fw_script_file" ]
-		_fw_rc=$?
-		unset _fw_pid _fw_script_file _fw_use_read_d _fw_argv0 _fw_argv1 _fw_argv2
-		return "$_fw_rc"
-	fi
-
-	_fw_cmdline_sentinel='KAM_FSWATCH_CMDLINE_END'
-	_fw_cmdline="$({ tr '\000' '\n' <"/proc/$_fw_pid/cmdline" && printf '%s' "$_fw_cmdline_sentinel"; } 2>/dev/null)" || return 1
-	case "$_fw_cmdline" in
-	*"$_fw_cmdline_sentinel") _fw_cmdline="${_fw_cmdline%"$_fw_cmdline_sentinel"}" ;;
-	*) return 1 ;;
-	esac
-	_fw_newline='
-'
-	_fw_argv0="${_fw_cmdline%%"$_fw_newline"*}"
-	_fw_cmdline_tail="${_fw_cmdline#*"$_fw_newline"}"
-	if [ "$_fw_cmdline_tail" = "$_fw_cmdline" ]; then
-		_fw_argv1=""
-		_fw_argv2=""
-	else
-		_fw_argv1="${_fw_cmdline_tail%%"$_fw_newline"*}"
-		_fw_argv2="${_fw_cmdline_tail#*"$_fw_newline"}"
-		[ "$_fw_argv2" != "$_fw_cmdline_tail" ] || _fw_argv2=""
-	fi
+	done <<EOF
+$_fw_cmdline
+EOF
+	[ "$_fw_index" -eq 2 ] || return 1
 	case "${_fw_argv0##*/}" in
 	sh | ash | dash | bash | ksh | mksh) ;;
-	*)
-		unset _fw_pid _fw_script_file _fw_cmdline_sentinel _fw_cmdline _fw_newline _fw_cmdline_tail _fw_argv0 _fw_argv1 _fw_argv2
-		return 1
-		;;
+	*) return 1 ;;
 	esac
-	[ "$_fw_argv1" = "$_fw_script_file" ] && [ -z "$_fw_argv2" ]
-	_fw_rc=$?
-	unset _fw_pid _fw_script_file _fw_cmdline_sentinel _fw_cmdline _fw_newline _fw_cmdline_tail _fw_argv0 _fw_argv1 _fw_argv2
-	return "$_fw_rc"
+	[ "$_fw_argv1" = "$_fw_script_file" ]
 )
 
 fswatch_stop_pid_for_script() (
@@ -230,11 +191,6 @@ fswatch_stop_pid_for_script() (
 fswatch_stop_script_processes() (
 	_fw_script_file="$1"
 	_fw_stopped=1
-	if fswatch_read_d_supported; then
-		_fw_read_d_supported=1
-	else
-		_fw_read_d_supported=0
-	fi
 	for _fw_proc_dir in /proc/[0-9]*; do
 		[ -d "$_fw_proc_dir" ] || continue
 		_fw_pid="${_fw_proc_dir##*/}"
@@ -258,14 +214,10 @@ fswatch_lifecycle_lock_file() (
 
 fswatch_process_start_time() (
 	_fw_pid="$1"
-	[ -r "/proc/$_fw_pid/stat" ] || return 1
-	IFS= read -r _fw_stat <"/proc/$_fw_pid/stat" || return 1
-	_fw_stat_tail="${_fw_stat##*) }"
-	# shellcheck disable=SC2086 # proc stat fields must be split positionally.
-	set -- $_fw_stat_tail
-	[ "$#" -ge 20 ] || return 1
-	shift 19
-	print "$1"
+	_fw_identity=$(fswatch_proc_stat_identity "$_fw_pid") || return 1
+	_fw_start=${_fw_identity#* }
+	case "$_fw_start" in '' | *[!0-9]*) return 1 ;; esac
+	print "$_fw_start"
 )
 
 fswatch_run_locked() (
@@ -435,29 +387,37 @@ fswatch_changed() {
 
 	_fw_tmp_dir="${TMPDIR:-}"
 	if [ -z "$_fw_tmp_dir" ] || [ ! -d "$_fw_tmp_dir" ] || [ ! -w "$_fw_tmp_dir" ]; then
-		_fw_tmp_dir="${KAM_HOME:-${MODDIR:-/data/local/tmp}}/.tmp"
-		mkdir -p "$_fw_tmp_dir" 2>/dev/null || _fw_tmp_dir="/data/local/tmp"
+		_fw_module_root="${KAM_HOME:-${MODDIR:-}}"
+		[ -n "$_fw_module_root" ] || {
+			unset _fw_path _fw_snapshot _fw_tmp_dir _fw_module_root
+			return 1
+		}
+		_fw_tmp_dir="${_fw_module_root}/.tmp"
+		mkdir -p "$_fw_tmp_dir" 2>/dev/null || {
+			unset _fw_path _fw_snapshot _fw_tmp_dir _fw_module_root
+			return 1
+		}
 	fi
 	_fw_tmp="$_fw_tmp_dir/kamfw.fswatch.$$"
 	fswatch_snapshot "$_fw_path" >"$_fw_tmp" || {
 		rm -f "$_fw_tmp" 2>/dev/null || true
-		unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp
+		unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp _fw_module_root
 		return 1
 	}
 
 	if [ ! -f "$_fw_snapshot" ] || ! cmp -s "$_fw_tmp" "$_fw_snapshot" 2>/dev/null; then
 		cp "$_fw_tmp" "$_fw_snapshot" 2>/dev/null || {
 			rm -f "$_fw_tmp" 2>/dev/null || true
-			unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp
+			unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp _fw_module_root
 			return 1
 		}
 		rm -f "$_fw_tmp" 2>/dev/null || true
-		unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp
+		unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp _fw_module_root
 		return 0
 	fi
 
 	rm -f "$_fw_tmp" 2>/dev/null || true
-	unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp
+	unset _fw_path _fw_snapshot _fw_tmp_dir _fw_tmp _fw_module_root
 	return 1
 }
 
@@ -604,9 +564,17 @@ fswatch_start_unlocked() {
 		printf '%s\n' 'trap "" HUP'
 		printf '%s\n' 'while :; do'
 		printf '%s\n' '  [ ! -f "$KAM_HOME/disable" ] && [ ! -f "$KAM_HOME/remove" ] || exit 0'
+		printf '%s\n' "  _fw_previous_snapshot=$(fswatch_shell_quote "${_fw_loop_snapshot_file}.previous")"
+		printf '%s\n' "  cp $(fswatch_shell_quote "$_fw_loop_snapshot_file") \"\$_fw_previous_snapshot\" || exit 1"
 		printf '%s\n' "  if fswatch_changed $(fswatch_shell_quote "$_fw_loop_path") $(fswatch_shell_quote "$_fw_loop_snapshot_file"); then"
 		printf '%s\n' "    if command -v info >/dev/null 2>&1; then info $(fswatch_shell_quote "fswatch change detected: $_fw_loop_name"); fi"
-		printf '%s\n' "    KAM_FSWATCH_NAME=$(fswatch_shell_quote "$_fw_loop_name") KAM_FSWATCH_PATH=$(fswatch_shell_quote "$_fw_loop_path") KAM_FSWATCH_SNAPSHOT=$(fswatch_shell_quote "$_fw_loop_snapshot_file") sh -c $(fswatch_shell_quote "$_fw_loop_cmd")"
+		printf '%s\n' "    if KAM_FSWATCH_NAME=$(fswatch_shell_quote "$_fw_loop_name") KAM_FSWATCH_PATH=$(fswatch_shell_quote "$_fw_loop_path") KAM_FSWATCH_SNAPSHOT=$(fswatch_shell_quote "$_fw_loop_snapshot_file") sh -c $(fswatch_shell_quote "$_fw_loop_cmd"); then"
+		printf '%s\n' '      rm -f "$_fw_previous_snapshot"'
+		printf '%s\n' '    else'
+		printf '%s\n' "      mv -f \"\$_fw_previous_snapshot\" $(fswatch_shell_quote "$_fw_loop_snapshot_file") || exit 1"
+		printf '%s\n' '    fi'
+		printf '%s\n' '  else'
+		printf '%s\n' '    rm -f "$_fw_previous_snapshot"'
 		printf '%s\n' '  fi'
 		printf '%s\n' "  sleep $(fswatch_shell_quote "$_fw_loop_interval")"
 		printf '%s\n' 'done'
