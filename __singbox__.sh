@@ -6,23 +6,40 @@
 import rich
 import self
 
-singbox_pids() {
-    # Host-only compatibility; packaged Android modules always use the bounded
-    # Rust lookup below and never fall back to an N-entry /proc scan.
-    if [ ! -x /system/bin/getprop ] && command -v pidof >/dev/null 2>&1; then
-        _pidof_output=$(pidof sing-box 2>/dev/null) || return 0
-        for _pid in $_pidof_output; do
-            case "$_pid" in '' | *[!0-9]*) continue ;; esac
-            printf '%s\n' "$_pid"
-        done
-        unset _pidof_output _pid
-        return 0
-    fi
-    if [ -x "${MODDIR}/cli" ]; then
-        "${MODDIR}/cli" __proc-pids sing-box 2>/dev/null
+# Return 0 with PIDs in the private destination file, 1 for an authoritative
+# empty set, or 2 when discovery is indeterminate. MagicNet common.sh loads the
+# bounded, count-framed implementation before importing this helper.
+singbox_pids_to_file() {
+    _singbox_pid_output="$1"
+    if type magicnet_singbox_owned_pids_to_file >/dev/null 2>&1; then
+        magicnet_singbox_owned_pids_to_file \
+            "${MODDIR}/.config/sing-box/config.json" "$_singbox_pid_output"
         return $?
     fi
-    return 1
+    # Generic kamfw consumers without MagicNet ownership policy may still use
+    # bounded name discovery, but never fall back to an unbounded proc scan.
+    if type magicnet_proc_named_pids_to_file >/dev/null 2>&1; then
+        magicnet_proc_named_pids_to_file sing-box "$_singbox_pid_output"
+        return $?
+    fi
+    return 2
+}
+
+# Compatibility emitter only. Lifecycle paths use singbox_pids_to_file so the
+# tri-state return code cannot be erased by command substitution.
+singbox_pids() {
+    type magicnet_proc_query_temp_create >/dev/null 2>&1 || return 2
+    _singbox_pid_file=$(magicnet_proc_query_temp_create) || return 2
+    singbox_pids_to_file "$_singbox_pid_file"
+    _singbox_pid_rc=$?
+    if [ "$_singbox_pid_rc" -eq 0 ]; then
+        while IFS= read -r _singbox_pid; do
+            printf '%s\n' "$_singbox_pid"
+        done <"$_singbox_pid_file"
+    fi
+    rm -f "$_singbox_pid_file"
+    unset _singbox_pid_file _singbox_pid
+    return "$_singbox_pid_rc"
 }
 
 singbox_set_status_description() {
@@ -39,15 +56,20 @@ singbox_set_status_description() {
 }
 
 is_singbox_running() {
-    # Check if sing-box is running.
-    # Returns 0 if sing-box is running, 1 otherwise.
-    if [ -n "$(singbox_pids)" ]; then
-        singbox_set_status_description running
-        return 0
+    # Return 0=running, 1=definitely stopped, 2=indeterminate.
+    _singbox_running_file=$(magicnet_proc_query_temp_create) || return 2
+    if singbox_pids_to_file "$_singbox_running_file"; then
+        _singbox_running_rc=0
     else
-        singbox_set_status_description stopped
-        return 1
+        _singbox_running_rc=$?
     fi
+    rm -f "$_singbox_running_file"
+    case "$_singbox_running_rc" in
+    0) singbox_set_status_description running ;;
+    1) singbox_set_status_description stopped ;;
+    *) return 2 ;;
+    esac
+    return "$_singbox_running_rc"
 }
 
 singbox_wait_ready() {
@@ -202,9 +224,21 @@ singbox_prepare_route_config() {
 
 singbox_start() {
     if is_singbox_running; then
+        _singbox_start_state=0
+    else
+        _singbox_start_state=$?
+    fi
+    case "$_singbox_start_state" in
+    0)
         warn "sing-box is already running."
         return 0
-    fi
+        ;;
+    1) ;;
+    *)
+        error "sing-box process discovery is indeterminate; start aborted."
+        return 2
+        ;;
+    esac
 
     singbox_tun
 
@@ -225,14 +259,20 @@ singbox_start() {
         info "Starting sing-box..."
         # 使用 nohup 后台运行，并将日志重定向
         nohup sing-box run -c "$_config" -D "$_workdir" >"$_log" 2>&1 &
+        _started_pid=$!
 
         if singbox_wait_ready; then
             success "sing-box started successfully."
-            unset _config _log _workdir _attempt
+            unset _config _log _workdir _attempt _started_pid
             return 0
         fi
 
         warn "sing-box process did not stay running; stopping partial start."
+        # This PID came directly from the launch above, so cleanup does not
+        # depend on a second discovery call that may itself be indeterminate.
+        kill "$_started_pid" 2>/dev/null || true
+        sleep 1
+        kill -9 "$_started_pid" 2>/dev/null || true
         singbox_stop >/dev/null 2>&1 || true
         _attempt=$((_attempt + 1))
         [ "$_attempt" -le "${MAGICNET_SINGBOX_START_ATTEMPTS:-1}" ] && sleep 1
@@ -248,38 +288,94 @@ singbox_start() {
     return 1
 }
 
+singbox_signal_pids_file() {
+    _singbox_signal_file="$1"
+    _singbox_signal="$2"
+    while IFS= read -r _singbox_signal_pid; do
+        case "$_singbox_signal_pid" in '' | *[!0-9]* | 0) return 1 ;; esac
+        if [ "$_singbox_signal" = 9 ]; then
+            kill -9 "$_singbox_signal_pid" 2>/dev/null || true
+        else
+            kill "$_singbox_signal_pid" 2>/dev/null || true
+        fi
+    done <"$_singbox_signal_file"
+}
+
 singbox_stop() {
-    if is_singbox_running; then
-        info "Stopping sing-box..."
-        _pids=$(singbox_pids)
-        [ -n "$_pids" ] && kill $_pids 2>/dev/null || true
+    _singbox_stop_file=$(magicnet_proc_query_temp_create) || return 2
+    if singbox_pids_to_file "$_singbox_stop_file"; then
+        _singbox_stop_state=0
+    else
+        _singbox_stop_state=$?
+    fi
+    case "$_singbox_stop_state" in
+    1)
+        rm -f "$_singbox_stop_file"
+        success "sing-box stopped."
+        return 0
+        ;;
+    0) ;;
+    *)
+        rm -f "$_singbox_stop_file"
+        error "sing-box process discovery is indeterminate; stop aborted."
+        return 2
+        ;;
+    esac
+
+    info "Stopping sing-box..."
+    singbox_signal_pids_file "$_singbox_stop_file" 15 || true
+    sleep 1
+    if singbox_pids_to_file "$_singbox_stop_file"; then
+        _singbox_stop_state=0
+    else
+        _singbox_stop_state=$?
+    fi
+    if [ "$_singbox_stop_state" -eq 0 ]; then
+        singbox_signal_pids_file "$_singbox_stop_file" 9 || true
         sleep 1
-        # 再次检查，如果还在运行则强杀
-        if is_singbox_running; then
-            _pids=$(singbox_pids)
-            [ -n "$_pids" ] && kill -9 $_pids 2>/dev/null || true
+        if singbox_pids_to_file "$_singbox_stop_file"; then
+            _singbox_stop_state=0
+        else
+            _singbox_stop_state=$?
         fi
     fi
-
-    if ! is_singbox_running; then
+    rm -f "$_singbox_stop_file"
+    case "$_singbox_stop_state" in
+    1)
         success "sing-box stopped."
-        unset _pids
         return 0
-    else
+        ;;
+    2)
+        error "sing-box stop state is indeterminate."
+        return 2
+        ;;
+    *)
         error "Failed to stop sing-box."
-        unset _pids
         return 1
-    fi
+        ;;
+    esac
 }
 
 toggle_singbox() {
     if is_singbox_running; then
+        _singbox_toggle_state=0
+    else
+        _singbox_toggle_state=$?
+    fi
+    case "$_singbox_toggle_state" in
+    0)
         info "Stop and check"
         singbox_stop
-    else
+        ;;
+    1)
         info "Start and check"
         singbox_start
-    fi
+        ;;
+    *)
+        error "sing-box process discovery is indeterminate; toggle aborted."
+        return 2
+        ;;
+    esac
 }
 
 set_i18n "TOGGLE_SINGBOX" \
@@ -306,14 +402,25 @@ set_i18n "NOT_RUNNING" \
     "ja" "実行していません" \
     "ko" "実行 중 아님"
 
+set_i18n "PROCESS_STATE_UNKNOWN" \
+    "zh" "进程状态未知" \
+    "en" "Process state unknown" \
+    "ja" "プロセス状態不明" \
+    "ko" "프로세스 상태 알 수 없음"
+
 ask_toggle_singbox() {
     # Ask the user to toggle sing-box.
     # Question key:    TOGGLE_SINGBOX
     if is_singbox_running; then
-        _singbox_state="$(i18n 'RUNNING')"
+        _singbox_question_state=0
     else
-        _singbox_state="$(i18n 'NOT_RUNNING')"
+        _singbox_question_state=$?
     fi
+    case "$_singbox_question_state" in
+    0) _singbox_state="$(i18n 'RUNNING')" ;;
+    1) _singbox_state="$(i18n 'NOT_RUNNING')" ;;
+    *) _singbox_state="$(i18n 'PROCESS_STATE_UNKNOWN')" ;;
+    esac
     panel "$(i18n 'SINGBOX_STATUS')"
     panel_row "$(i18n 'SINGBOX_STATUS')" "$_singbox_state"
     panel_end
