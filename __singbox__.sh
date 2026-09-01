@@ -107,10 +107,50 @@ singbox_tun() {
     if [ ! -c "/dev/net/tun" ]; then
         error "无法创建 /dev/net/tun，可能的原因："
         warn "系统不支持 TUN/TAP 驱动或内核不兼容"
-        exit 1
+        return 1
     fi
     info "/dev/net/tun 为字符设备，检查通过"
+}
 
+singbox_managed_inbound_type() {
+    _singbox_inbound_config="$1"
+    _singbox_inbound_jq="${MODDIR}/bin/jq"
+    [ -f "$_singbox_inbound_config" ] && [ -x "$_singbox_inbound_jq" ] || {
+        error "$(i18n 'SINGBOX_INBOUND_CHECK_UNAVAILABLE')"
+        unset _singbox_inbound_config _singbox_inbound_jq
+        return 1
+    }
+    _singbox_inbound_type="$("$_singbox_inbound_jq" -r '
+        [.inbounds[]? | select((.type // "") == "tun" or (.type // "") == "ebpf") | .type]
+        | if length == 0 then "none" elif length == 1 then .[0] else "" end
+    ' "$_singbox_inbound_config" 2>/dev/null)" || {
+        unset _singbox_inbound_config _singbox_inbound_jq _singbox_inbound_type
+        return 1
+    }
+    case "$_singbox_inbound_type" in
+    none | tun | ebpf)
+        printf '%s\n' "$_singbox_inbound_type"
+        unset _singbox_inbound_config _singbox_inbound_jq _singbox_inbound_type
+        return 0
+        ;;
+    *)
+        error "$(i18n 'SINGBOX_MANAGED_INBOUND_INVALID')"
+        unset _singbox_inbound_config _singbox_inbound_jq _singbox_inbound_type
+        return 1
+        ;;
+    esac
+}
+
+singbox_prepare_dataplane() {
+    _singbox_dataplane_type="$(singbox_managed_inbound_type "$1")" || return 1
+    case "$_singbox_dataplane_type" in
+    tun) singbox_tun ;;
+    none | ebpf) : ;;
+    *) unset _singbox_dataplane_type; return 1 ;;
+    esac
+    _singbox_dataplane_rc=$?
+    unset _singbox_dataplane_type
+    return "$_singbox_dataplane_rc"
 }
 
 singbox_prepare_route_config() {
@@ -240,14 +280,16 @@ singbox_start() {
         ;;
     esac
 
-    singbox_tun
-
     _config="${MODDIR}/.config/sing-box/config.json"
     _log="${MODDIR}/.log/sing-box.log"
     _workdir="${MODDIR}/.config/sing-box"
 
     if [ ! -f "$_config" ]; then
         error "Config file not found: $_config"
+        return 1
+    fi
+    if ! singbox_prepare_dataplane "$_config"; then
+        unset _config _log _workdir
         return 1
     fi
 
@@ -407,6 +449,18 @@ set_i18n "PROCESS_STATE_UNKNOWN" \
     "en" "Process state unknown" \
     "ja" "プロセス状態不明" \
     "ko" "프로세스 상태 알 수 없음"
+
+set_i18n "SINGBOX_INBOUND_CHECK_UNAVAILABLE" \
+    "zh" "无法读取 sing-box 受管透明入站类型" \
+    "en" "Unable to read the managed sing-box transparent inbound type" \
+    "ja" "sing-box の管理対象透過インバウンド種別を読み取れません" \
+    "ko" "관리되는 sing-box 투명 인바운드 유형을 읽을 수 없습니다"
+
+set_i18n "SINGBOX_MANAGED_INBOUND_INVALID" \
+    "zh" "sing-box 配置不能同时包含多个 tun 或 ebpf 透明入站" \
+    "en" "The sing-box config cannot contain multiple tun or ebpf transparent inbounds" \
+    "ja" "sing-box 設定に複数の tun または ebpf 透過インバウンドを含めることはできません" \
+    "ko" "sing-box 구성에는 여러 tun 또는 ebpf 투명 인바운드를 포함할 수 없습니다"
 
 ask_toggle_singbox() {
     # Ask the user to toggle sing-box.
