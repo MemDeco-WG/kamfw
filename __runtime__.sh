@@ -21,11 +21,13 @@ kamfw_init_home() {
         "$KAM_HOME/.config" \
         "$KAM_HOME/.cache" \
         "$KAM_HOME/.state" \
-        "$KAM_HOME/.log" \
-        "$KAM_HOME/.tmp"; do
+        "$KAM_HOME/.log"; do
         [ -d "$_d" ] || mkdir -p "$_d" 2>/dev/null
     done
 
+    # .tmp is lazy: payload/cache/transaction owners create it when needed.
+    # Only remove the unused legacy spelling when it is genuinely empty.
+    rmdir "$KAM_HOME/tmp" 2>/dev/null || true
     unset _d
 }
 
@@ -48,18 +50,18 @@ kamfw() {
     [ $# -gt 0 ] && shift
 
     case "$_cmd" in
-        run)
-            kamfw_run "$@"
-            ;;
-        help|-h|--help)
-            printf '%s\n' "Usage: kamfw run <phase> -- [args...]"
-            ;;
-        *)
-            # 兼容未来扩展
-            # 关键路径：输出必须走统一通道；error 失败视为框架未初始化，直接 abort。
-            error "Invalid kamfw command: $_cmd" || abort "Invalid kamfw command: $_cmd"
-            return 1
-            ;;
+    run)
+        kamfw_run "$@"
+        ;;
+    help | -h | --help)
+        printf '%s\n' "Usage: kamfw run <phase> -- [args...]"
+        ;;
+    *)
+        # 兼容未来扩展
+        # 关键路径：输出必须走统一通道；error 失败视为框架未初始化，直接 abort。
+        error "Invalid kamfw command: $_cmd" || abort "Invalid kamfw command: $_cmd"
+        return 1
+        ;;
     esac
 
     unset _cmd
@@ -83,34 +85,34 @@ kamfw_run() {
 
     # Phase route: shell handlers are the runtime source of truth.
     case "$_phase" in
-        install)
-            import __install_core__
-            kamfw_phase_install "$@"
-            ;;
-        post-fs-data)
-            kamfw_phase_post_fs_data "$@"
-            ;;
-        service)
-            kamfw_phase_service "$@"
-            ;;
-        boot-completed)
-            kamfw_phase_boot_completed "$@"
-            ;;
-        uninstall)
-            import __uninstall__
-            kamfw_phase_uninstall "$@"
-            ;;
-        action)
-            kamfw_phase_action "$@"
-            ;;
-        post-mount)
-            kamfw_phase_post_mount "$@"
-            ;;
-        *)
-            # 关键路径：输出必须走统一通道；error 失败视为框架未初始化，直接 abort。
-            error "Unknown phase: $_phase" || abort "Unknown phase: $_phase"
-            return 2
-            ;;
+    install)
+        import __install_core__
+        kamfw_phase_install "$@"
+        ;;
+    post-fs-data)
+        kamfw_phase_post_fs_data "$@"
+        ;;
+    service)
+        kamfw_phase_service "$@"
+        ;;
+    boot-completed)
+        kamfw_phase_boot_completed "$@"
+        ;;
+    uninstall)
+        import __uninstall__
+        kamfw_phase_uninstall "$@"
+        ;;
+    action)
+        kamfw_phase_action "$@"
+        ;;
+    post-mount)
+        kamfw_phase_post_mount "$@"
+        ;;
+    *)
+        # 关键路径：输出必须走统一通道；error 失败视为框架未初始化，直接 abort。
+        error "Unknown phase: $_phase" || abort "Unknown phase: $_phase"
+        return 2
+        ;;
     esac
 
     unset _phase

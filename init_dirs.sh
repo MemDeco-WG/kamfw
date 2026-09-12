@@ -17,13 +17,16 @@ kam_init_dirs() {
     return 1
   fi
 
-  # Keep runtime state under $KAM_ROOT.
+  # Temporary workspaces are created by their owners on demand.
+  # Remove only the unused legacy directory, never active/non-empty data.
+  rmdir "$KAM_HOME/tmp" 2>/dev/null || true
+
+  # Keep runtime state under $KAM_HOME.
   _kam_dirs="\
 $KAM_HOME/.config \
 $KAM_HOME/.cache \
 $KAM_HOME/.state \
-$KAM_HOME/.log \
-$KAM_HOME/tmp\
+$KAM_HOME/.log\
 "
 
   for _d in $_kam_dirs; do
