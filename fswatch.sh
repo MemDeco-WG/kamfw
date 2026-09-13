@@ -392,7 +392,7 @@ fswatch_snapshot() {
 				fswatch_path_is_pruned "$_fw_item" && continue
 				cksum "$_fw_item" 2>/dev/null | sed 's/^/F /'
 			done
-		} | sort
+		} | LC_ALL=C sort
 	else
 		cksum "$_fw_path" 2>/dev/null | sed 's/^/F /'
 	fi
