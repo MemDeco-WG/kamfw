@@ -43,6 +43,11 @@ singbox_pids() {
 }
 
 singbox_set_status_description() {
+    # Preserve an actionable startup/update error; a stopped process is only
+    # the symptom and should not erase the cause shown by the module manager.
+    if [ "$1" != "running" ] && [ -s "${MODDIR}/.state/startup-error" ]; then
+        return 0
+    fi
     if [ "$1" = "running" ]; then
         _singbox_description="$(i18n 'SINGBOX_STATUS'): $(i18n 'RUNNING')"
     else
