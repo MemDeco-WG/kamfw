@@ -224,8 +224,13 @@ fswatch_snapshot() (
     [ -e "$1" ] || { error "$(i18n FSWATCH_PATH_MISSING | t "$1")"; return 1; }
     fswatch_require_tools || return 1
     if [ -d "$1" ]; then
+        set -f
+        fswatch_path_is_pruned "$1" && return 0
         set -- "$1"
-        for name in ${KAM_FSWATCH_PRUNE_NAMES:-}; do set -- "$@" -name "$name" -prune -o; done
+        for name in ${KAM_FSWATCH_PRUNE_NAMES:-}; do
+            case "$name" in *'['*|*']'*|*'*'*|*'?'*|*'\'*) name=$(printf '%s' "$name" | sed 's/[][\\*?]/\\&/g') ;; esac
+            set -- "$@" -path "*/$name" -prune -o
+        done
         {
             find "$@" -type d -print | sed 's/^/D /'
             find "$@" -type f -exec cksum '{}' + | sed 's/^/F /'

@@ -86,6 +86,29 @@ cache_download --hash-url https://example.test/hash https://example.test "$MODDI
         self.assertNotEqual(result['code'], 0, result)
         self.assertEqual(result['files']['module/body'], 'installed')
 
+    def test_generic_download_keeps_baseline_timeout_policy(self):
+        body = QUIET + r'''
+import cache_download
+curl() {
+    printf '%s\n' "$@" >>"$FIXTURE/curl.arguments"
+    output=''
+    while [ $# -gt 0 ]; do
+        case "$1" in -o) output=$2; shift 2 ;; *) shift ;; esac
+    done
+    if [ -n "$output" ]; then cp "$FIXTURE/remote" "$output"
+    else cache_download_sha256 "$FIXTURE/remote"; fi
+}
+cache_download --hash-url https://example.test/hash --hash-file "$FIXTURE/digest" https://example.test/body "$MODDIR/body"
+'''
+        result = run(ROOT, body, {'remote': 'trusted'}, ('module/body', 'curl.arguments'))
+        self.assertEqual(result['code'], 0, result)
+        self.assertEqual(result['files']['module/body'], 'trusted')
+        calls = result['files']['curl.arguments']
+        self.assertIn('https://example.test/hash', calls)
+        self.assertIn('https://example.test/body', calls)
+        self.assertNotIn('--connect-timeout', calls)
+        self.assertNotIn('--max-time', calls)
+
     def test_config_stdin_does_not_leak_and_paths_stay_local(self):
         body = QUIET + r'''
 import self

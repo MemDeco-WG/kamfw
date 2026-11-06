@@ -252,6 +252,14 @@ for interval in 0 1 05 -1 1.5 x ''; do
     watchdog_valid_interval "$interval"; printf '%s:%s\n' "$interval" "$?"
 done
 ''', {}, ()),
+    'watcher_literal_path_suffix_pruning': (r'''import fswatch
+KAM_FSWATCH_PRUNE_NAMES='nested/generated.json nested/staging literal[1] star*file question?file'
+fswatch_snapshot "$FIXTURE/tree"
+fswatch_snapshot "$FIXTURE/tree/nested/staging/child"
+''', {'tree/input': 'input', 'tree/nested/generated.json': 'generated',
+      'tree/nested/staging/child/ignored': 'staging', 'tree/literal[1]/ignored': 'brackets',
+      'tree/star*file': 'star', 'tree/starXfile': 'visible', 'tree/question?file': 'question',
+      'tree/questionXfile': 'visible'}, ()),
     'rich_layout': (r'''import rich
 COL_CYN='' COL_GRN='' COL_YLW='' COL_RED='' COL_RST=''
 __rich_terminal_width() { printf 24; }

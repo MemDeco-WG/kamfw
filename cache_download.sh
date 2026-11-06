@@ -67,7 +67,7 @@ cache_download_hash_file() (
 cache_download_parse_hash() { sed -n 's/.*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1 | tr '[:upper:]' '[:lower:]'; }
 cache_download_remote_hash() (
     cache_download_require curl || return 1
-    body=$(curl -fsSL --connect-timeout 10 --max-time 60 "$1") || return 1
+    body=$(curl -fsSL "$1") || return 1
     hash=$(printf '%s' "$body" | cache_download_parse_hash)
     [ -n "$hash" ] && printf '%s\n' "$hash"
 )
@@ -109,7 +109,7 @@ _cache_download_transaction() (
     fi
     temporary=$(mktemp "$(dirname "$dest")/.${dest##*/}.kamfw-download.XXXXXX") || return 1
     trap 'rm -f "$temporary"' EXIT
-    curl -fsSL --connect-timeout 10 --max-time 60 -o "$temporary" "$url" || {
+    curl -fsSL -o "$temporary" "$url" || {
         error "$(i18n CACHE_DOWNLOAD_DOWNLOAD_FAILED | t "$url")"; return 1;
     }
     digest=$(cache_download_sha256 "$temporary") || { error "$(i18n CACHE_DOWNLOAD_HASH_FAILED | t "$temporary")"; return 1; }
