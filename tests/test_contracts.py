@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shlex
+import shutil
 from pathlib import Path
 import subprocess
 import tempfile
@@ -306,6 +307,47 @@ delprop_if_exist test.prop
 
 
 class Contracts(unittest.TestCase):
+    def test_fswatch_prunes_literal_paths_and_basenames(self):
+        body = r'''import fswatch
+KAM_FSWATCH_PRUNE_NAMES='generated sing-box/config.json sing-box/.magicnet-staging sing-box/config[ab].json literal*.json literal?.json literal\name closing]name'
+fswatch_snapshot "$FIXTURE/tree" >"$FIXTURE/snapshot"
+sed -n 's/^F [0-9]* [0-9]* //p' "$FIXTURE/snapshot"
+for root in sing-box/.magicnet-staging/deep generated/nested; do
+    fswatch_snapshot "$FIXTURE/tree/$root" >"$FIXTURE/pruned-root" || exit 1
+    test ! -s "$FIXTURE/pruned-root" || exit 1
+done
+# A direct file snapshot retains its existing behavior even under a prune.
+fswatch_snapshot "$FIXTURE/tree/generated/nested/ignored" >"$FIXTURE/direct-file" || exit 1
+test -s "$FIXTURE/direct-file"
+'''
+        pruned = (
+            'sing-box/config.json', 'sing-box/.magicnet-staging/config.json.42',
+            'sing-box/.magicnet-staging/deep/ignored', 'generated/nested/ignored',
+            'nested/sing-box/config.json', 'sing-box/config[ab].json',
+            'generated/ignored', 'other/generated/ignored',
+            'cache/literal*.json', 'cache/literal?.json', r'cache/literal\name',
+            'cache/closing]name',
+        )
+        observed = (
+            'input', 'other/config.json', 'other/.magicnet-staging/input',
+            'sing-box/config.source.json', 'sing-box/configa.json',
+            'sing-box/configb.json', 'cache/literal-one.json',
+            'cache/literalx.json', 'cache/literalname', 'cache/closingname',
+        )
+        files = {f'tree/{path}': 'body' for path in (*pruned, *observed)}
+        # Matching names in the shell's cwd must not expand the literal list.
+        files.update({'literal-expanded.json': 'outside', 'sing-box/configa.json': 'outside'})
+        finders = {'host': ''}
+        busybox = shutil.which('busybox')
+        if busybox:
+            finders['busybox'] = f'find() {{ {shlex.quote(busybox)} find "$@"; }}\n'
+        for backend, setup in finders.items():
+            with self.subTest(find=backend):
+                result = run(ROOT, setup + body, files)
+                self.assertEqual(result['code'], 0, result)
+                self.assertEqual(sorted(result['stdout'].splitlines()),
+                                 sorted(f'<fixture>/tree/{path}' for path in observed), result)
+
     def test_public_contracts(self):
         for name, (body, files, collect) in CASES.items():
             with self.subTest(contract=name):
