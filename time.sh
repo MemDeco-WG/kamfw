@@ -1,122 +1,50 @@
 # shellcheck shell=ash
-##########################################################################################
-# KAM Framework - Time & Format Utility Library
-# Optimized for ash (No 'local' support)
-##########################################################################################
 
-# --- Internal Helper: Get Current Epoch ---
-# Returns milliseconds if supported, otherwise seconds
-_kam_get_now() {
-	_kn_val=$(date +%s%N 2>/dev/null)
-	case "$_kn_val" in
-	*N*) date +%s ;;
-	*) echo "$((_kn_val / 1000000))" ;;
-	esac
+_kam_get_now() (
+    now=$(date +%s%N 2>/dev/null)
+    case "$now" in *N*) date +%s ;; *) printf '%s\n' "$((now / 1000000))" ;; esac
+)
+
+_kam_timer_key() {
+    case "${1:-}" in ''|*[!A-Za-z0-9_]*) return 1 ;; esac
 }
 
-# =============================================================================
-# 1. Timer Functions (Key-Value Based)
-# =============================================================================
-
-# timer_start <key>
 timer_start() {
-	_t_key=$1
-	[ -z "$_t_key" ] && return 1
-	_t_start_val=$(_kam_get_now)
-	eval "export KAM_T_${_t_key}=\"$_t_start_val\""
+    _kam_timer_key "${1:-}" || return 1
+    export "KAM_T_$1=$(_kam_get_now)"
 }
 
-# timer_get_interval <key>
-# Returns delta in ms (or seconds depending on system support)
-timer_get_interval() {
-	_t_key=$1
-	eval "_t_s_time=\$KAM_T_${_t_key}"
-	if [ -z "$_t_s_time" ]; then
-		echo "0"
-		return 1
-	fi
-	_t_e_time=$(_kam_get_now)
-	echo "$((_t_e_time - _t_s_time))"
-}
+timer_get_interval() (
+    _kam_timer_key "${1:-}" || return 1
+    eval "start=\${KAM_T_$1:-}"
+    [ -n "$start" ] || { printf '0\n'; return 1; }
+    printf '%s\n' "$(($(_kam_get_now) - start))"
+)
 
-# timer_stop <key>
 timer_stop() {
-	_t_key=$1
-	_t_diff=$(timer_get_interval "$_t_key")
-	echo "$_t_diff"
-	eval "unset KAM_T_${_t_key}"
+    _kam_timer_key "${1:-}" || return 1
+    timer_get_interval "$1"
+    unset "KAM_T_$1"
 }
 
-# =============================================================================
-# 2. String Format Functions (Preset Styles)
-# =============================================================================
+get_time_iso() { date '+%Y-%m-%dT%H:%M:%S'; }
+get_time_log() { date '+[%Y-%m-%d %H:%M:%S]'; }
+get_time_fixed() { date '+%Y%m%d_%H%M%S'; }
+get_time_short() { date '+%b %d, %H:%M'; }
+get_time_http() { date -u '+%a, %d %b %Y %H:%M:%S GMT'; }
 
-# ISO 8601: 2025-12-28T02:31:00
-get_time_iso() {
-	date +"%Y-%m-%dT%H:%M:%S"
-}
-
-# Log Style: [2025-12-28 02:31:00]
-get_time_log() {
-	date +"[%Y-%m-%d %H:%M:%S]"
-}
-
-# Filename Safe: 20251228_023100
-get_time_fixed() {
-	date +"%Y%m%d_%H%M%S"
-}
-
-# Short Human: Dec 28, 02:31
-get_time_short() {
-	date +"%b %d, %H:%M"
-}
-
-# HTTP Header Style: Sun, 28 Dec 2025 02:31:00 GMT
-get_time_http() {
-	date -u +"%a, %d %b %Y %H:%M:%S GMT"
-}
-
-# =============================================================================
-# 3. Conversion & Calculation
-# =============================================================================
-
-# format_duration <seconds>
-# Input: 3661 -> Output: 01:01:01
 format_duration() {
-	_d_sec=$1
-	[ -z "$_d_sec" ] && _d_sec=0
-
-	_d_h=$((_d_sec / 3600))
-	_d_m=$(((_d_sec % 3600) / 60))
-	_d_s=$((_d_sec % 60))
-
-	# Manual padding for ash compatibility
-	[ "${#_d_h}" -lt 2 ] && _d_h="0$_d_h"
-	[ "${#_d_m}" -lt 2 ] && _d_m="0$_d_m"
-	[ "${#_d_s}" -lt 2 ] && _d_s="0$_d_s"
-
-	echo "${_d_h}:${_d_m}:${_d_s}"
+    printf '%02d:%02d:%02d\n' "$((${1:-0} / 3600))" "$((${1:-0} % 3600 / 60))" "$((${1:-0} % 60))"
 }
 
-# timestamp_to_readable <unix_timestamp> [format]
 timestamp_to_readable() {
-	_tr_ts=$1
-	_tr_fmt=${2:-"%Y-%m-%d %H:%M:%S"}
-	# Try Busybox/Linux date first, then fallback to BSD/Unix
-	date -d "@$_tr_ts" +"$_tr_fmt" 2>/dev/null || date -r "$_tr_ts" +"$_tr_fmt"
+    date -d "@$1" "+${2:-%Y-%m-%d %H:%M:%S}" 2>/dev/null || date -r "$1" "+${2:-%Y-%m-%d %H:%M:%S}"
 }
 
-# get_greeting
-# Returns Morning/Afternoon/Evening based on system clock
-get_greeting() {
-	_g_hour=$(date +"%H")
-	_g_hour=${_g_hour#0} # Strip leading zero to avoid octal error
-
-	if [ "$_g_hour" -ge 5 ] && [ "$_g_hour" -lt 12 ]; then
-		echo "Good Morning"
-	elif [ "$_g_hour" -ge 12 ] && [ "$_g_hour" -lt 18 ]; then
-		echo "Good Afternoon"
-	else
-		echo "Good Evening"
-	fi
-}
+get_greeting() (
+    hour=$(date +%H)
+    hour=${hour#0}
+    if [ "$hour" -ge 5 ] && [ "$hour" -lt 12 ]; then printf 'Good Morning\n'
+    elif [ "$hour" -ge 12 ] && [ "$hour" -lt 18 ]; then printf 'Good Afternoon\n'
+    else printf 'Good Evening\n'; fi
+)
