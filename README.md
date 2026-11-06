@@ -252,6 +252,23 @@ KAM_CACHE_DOWNLOAD_STATE_DIR="$KAM_HOME/.cache/my-downloads"
 Use `--hash-file <file>` when a module wants to keep a stable, human-readable
 state file next to related config.
 
+## Android Launcher
+
+`import launcher` loads URL, browser, and app launch helpers without starting an
+activity. Call the helper explicitly:
+
+```sh
+import launcher
+launch browser "https://example.com"
+launch url "https://example.com"
+launch app "com.android.settings"
+```
+
+`launch browser` resolves the foreground user's browser role, then falls back to
+a browsable `ACTION_VIEW` intent and the activity shell command. ActivityManager
+errors return a failure status even when Android prints an error with exit status
+zero. Calls preserve the caller's variables and propagate the launch result.
+
 ## Notification
 
 `import notify` loads a small Android notification helper. It uses
