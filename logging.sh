@@ -67,9 +67,10 @@ log() (
     done
     [ "$mode" != overwrite ] || : >"$file" || return 1
     if [ -n "$size" ] && ! command -v logrotate_file >/dev/null 2>&1; then import logrotate || return 1; fi
+    escape=$(printf '\033')
     _kam_log_write() {
         [ -z "$size" ] || logrotate_file --size "$size" --keep "$keep" "$file" >/dev/null 2>&1 || true
-        clean=$(printf '%s' "$1" | sed 's/\x1b//g;s/\[[0-9;]*m//g')
+        clean=$(printf '%s' "$1" | sed "s/$escape//g;s/\[[0-9;]*m//g")
         printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$clean" >>"$file"
     }
     if [ $# -gt 0 ]; then

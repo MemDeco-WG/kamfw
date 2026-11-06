@@ -51,7 +51,7 @@ ${__at_exit_handlers:-}
             *"
 $_ae_command
 "*) ;;
-            *) __at_exit_handlers="${__at_exit_handlers}${__at_exit_handlers:+
+            *) __at_exit_handlers="${__at_exit_handlers:-}${__at_exit_handlers:+
 }$_ae_command" ;;
         esac
     done

@@ -1,73 +1,61 @@
 # shellcheck shell=ash
 
-# No import-time side effects. Subshells keep caller variables and status intact.
-_launch_run() {
-    _launch_busybox="${KAM_LAUNCH_BUSYBOX:-}"
-    if [ -n "$_launch_busybox" ] && [ -x /system/bin/getprop ]; then
-        case "$_launch_busybox" in
-        /data/adb/ap/bin/busybox | /data/adb/ksu/bin/busybox | /data/adb/magisk/busybox | \
-            "${MODDIR}/bin/busybox" | "${MODDIR}/system/bin/busybox") ;;
-        *) _launch_busybox="" ;;
+_launch_run() (
+    busybox=${KAM_LAUNCH_BUSYBOX:-}
+    if [ -n "$busybox" ] && [ -x /system/bin/getprop ]; then
+        case "$busybox" in
+            /data/adb/ap/bin/busybox|/data/adb/ksu/bin/busybox|/data/adb/magisk/busybox|\
+            "${MODDIR:-}/bin/busybox"|"${MODDIR:-}/system/bin/busybox") ;;
+            *) busybox='' ;;
         esac
     fi
-    if [ -n "$_launch_busybox" ] && [ -x "$_launch_busybox" ]; then
-        "$_launch_busybox" timeout 5 "$@"
-    elif command -v timeout >/dev/null 2>&1; then
-        timeout 5 "$@"
-    else
-        "$@"
-    fi
-}
+    if [ -n "$busybox" ] && [ -x "$busybox" ]; then "$busybox" timeout 5 "$@"
+    elif command -v timeout >/dev/null 2>&1; then timeout 5 "$@"
+    else "$@"; fi
+)
+
 _launch_url() (
-    [ -n "${1:-}" ] || exit 2
-    command -v am >/dev/null 2>&1 || exit 127
+    [ -n "${1:-}" ] || return 2
+    command -v am >/dev/null 2>&1 || return 127
     _launch_run am start --user current -a android.intent.action.VIEW -d "$1" >/dev/null 2>&1
 )
 
-# Android can print an ActivityManager error while returning status zero.
+# ActivityManager may report an error in output while returning status zero.
 _launch_browser_start() (
-    _lbs_output=$(_launch_run "$@" 2>&1) || exit "$?"
-    case "$_lbs_output" in
-        *Error*|*Exception*|*'Permission Denial'*|*'Background activity'*|*'background activity'*) exit 1 ;;
+    output=$(_launch_run "$@" 2>&1) || return $?
+    case "$output" in
+        *Error*|*Exception*|*'Permission Denial'*|*'Background activity'*|*'background activity'*) return 1 ;;
     esac
 )
 
-# Ask Android for its current user's browser, never assume Chrome is installed.
-# A browser-role lookup is optional: ACTION_VIEW remains the portable fallback.
 _launch_browser() (
-    case "${1:-}" in http://?*|https://?*) ;; *) exit 2 ;; esac
-    command -v am >/dev/null 2>&1 || exit 127
-    _lb_package=''
-    # Older role services reject USER_CURRENT before resolving it. Query the
-    # numeric foreground user first, while still launching with --user current.
-    _lb_user=$(_launch_run am get-current-user 2>/dev/null) || _lb_user=''
-    case "$_lb_user" in ''|*[!0-9]*) _lb_user='' ;; esac
-    if [ -n "$_lb_user" ] && command -v cmd >/dev/null 2>&1; then
-        _lb_package=$(_launch_run cmd role get-role-holders --user "$_lb_user" android.app.role.BROWSER 2>/dev/null) || _lb_package=''
+    case "${1:-}" in http://?*|https://?*) ;; *) return 2 ;; esac
+    command -v am >/dev/null 2>&1 || return 127
+    url=$1
+    package=''
+    # Role queries require a numeric user on older Android releases.
+    user=$(_launch_run am get-current-user 2>/dev/null) || user=''
+    case "$user" in ''|*[!0-9]*) user='' ;; esac
+    if [ -n "$user" ] && command -v cmd >/dev/null 2>&1; then
+        package=$(_launch_run cmd role get-role-holders --user "$user" android.app.role.BROWSER 2>/dev/null) || package=''
     fi
-    case "$_lb_package" in ''|*[!A-Za-z0-9_.]*) _lb_package='' ;; esac
-    if [ -n "$_lb_package" ]; then
-        _launch_browser_start am start --user current -a android.intent.action.VIEW \
-            -f 0x10000000 -c android.intent.category.BROWSABLE -p "$_lb_package" -d "$1" >/dev/null 2>&1 && exit 0
+    case "$package" in ''|*[!A-Za-z0-9_.]*) package='' ;; esac
+    set -- --user current -a android.intent.action.VIEW -f 0x10000000 -c android.intent.category.BROWSABLE
+    if [ -n "$package" ]; then
+        _launch_browser_start am start "$@" -p "$package" -d "$url" >/dev/null 2>&1 && return 0
     fi
-    _launch_browser_start am start --user current -a android.intent.action.VIEW \
-        -f 0x10000000 -c android.intent.category.BROWSABLE -d "$1" && exit 0
-    # Direct Binder shell entry also works when the am wrapper fails in installers.
-    _launch_browser_start cmd activity start-activity --user current \
-        -a android.intent.action.VIEW -f 0x10000000 \
-        -c android.intent.category.BROWSABLE -d "$1"
+    _launch_browser_start am start "$@" -d "$url" && return 0
+    _launch_browser_start cmd activity start-activity "$@" -d "$url"
 )
 
 _launch_app() (
-    [ -n "${1:-}" ] || exit 2
+    [ -n "${1:-}" ] || return 2
     case "$1" in
-        */*)
-            command -v am >/dev/null 2>&1 || exit 127
-            _launch_run am start --user current -n "$1" >/dev/null 2>&1 ;;
-        *)
-            command -v monkey >/dev/null 2>&1 || exit 127
-            _launch_run monkey -p "$1" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 ;;
+        */*) set -- am start --user current -n "$1" ;;
+        *) set -- monkey -p "$1" -c android.intent.category.LAUNCHER 1 ;;
     esac
+    command -v "$1" >/dev/null 2>&1 || return 127
+    _launch_run "$@" >/dev/null 2>&1
 )
 
 launch() {

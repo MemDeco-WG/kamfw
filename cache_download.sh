@@ -1,10 +1,4 @@
 # shellcheck shell=ash
-#
-# cache_download.sh
-#
-# Cached download helper for kamfw.
-# Importing this module does not perform network or file work.
-
 set_i18n "CACHE_DOWNLOAD_MISSING_URL" \
 	"zh" "cache_download: URL 不能为空" \
 	"en" "cache_download: url is required"
@@ -37,184 +31,109 @@ set_i18n "CACHE_DOWNLOAD_UPDATED" \
 	"zh" "cache_download: 已更新: \$_1" \
 	"en" "cache_download: updated: \$_1"
 
-cache_download_msg() {
-	_cd_key="$1"
-	_cd_fallback="$2"
-	shift 2
-	_cd_msg="$(i18n "$_cd_key" 2>/dev/null)"
-	if [ -n "$_cd_msg" ]; then
-		printf '%s' "$_cd_msg" | t "$@" 2>/dev/null
-	else
-		printf '%s' "$_cd_fallback"
-	fi
-	unset _cd_key _cd_fallback _cd_msg
-}
-
+cache_download_msg() (
+    key=$1
+    fallback=$2
+    shift 2
+    message=$(i18n "$key")
+    if [ -n "$message" ]; then printf '%s' "$message" | t "$@"; else printf '%s' "$fallback"; fi
+)
 cache_download_require() {
-	if ! command -v "$1" >/dev/null 2>&1; then
-		error "$(cache_download_msg CACHE_DOWNLOAD_MISSING_TOOL "cache_download: required command not found: $1" "$1")"
-		return 1
-	fi
+    command -v "$1" >/dev/null 2>&1 || { error "$(i18n CACHE_DOWNLOAD_MISSING_TOOL | t "$1")"; return 1; }
 }
+cache_download_sha256() (
+    if command -v sha256sum >/dev/null 2>&1; then
+        value=$(sha256sum "$1") || return 1
+        printf '%s\n' "${value%% *}"
+    elif command -v shasum >/dev/null 2>&1; then
+        value=$(shasum -a 256 "$1") || return 1
+        printf '%s\n' "${value%% *}"
+    elif command -v openssl >/dev/null 2>&1; then
+        value=$(openssl dgst -sha256 <"$1") || return 1
+        printf '%s\n' "${value##* }"
+    else return 1; fi
+)
+cache_download_text_sha256() { printf '%s' "$1" | cache_download_sha256 /proc/self/fd/0; }
+cache_download_state_dir() (
+    directory=${KAM_CACHE_DOWNLOAD_STATE_DIR:-${KAM_HOME:-${MODDIR:-${MODPATH:-/tmp}}}/.cache/downloads}
+    mkdir -p "$directory" || return 1
+    printf '%s\n' "$directory"
+)
+cache_download_hash_file() (
+    directory=$(cache_download_state_dir) || return 1
+    key=$(cache_download_text_sha256 "$1|$2") || return 1
+    printf '%s/%s.sha256\n' "$directory" "$key"
+)
+cache_download_parse_hash() { sed -n 's/.*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1 | tr '[:upper:]' '[:lower:]'; }
+cache_download_remote_hash() (
+    cache_download_require curl || return 1
+    body=$(curl -fsSL --connect-timeout 10 --max-time 60 "$1") || return 1
+    hash=$(printf '%s' "$body" | cache_download_parse_hash)
+    [ -n "$hash" ] && printf '%s\n' "$hash"
+)
 
-cache_download_sha256() {
-	_cd_file="$1"
-	if command -v sha256sum >/dev/null 2>&1; then
-		sha256sum "$_cd_file" | awk '{print $1}'
-	elif command -v shasum >/dev/null 2>&1; then
-		shasum -a 256 "$_cd_file" | awk '{print $1}'
-	elif command -v openssl >/dev/null 2>&1; then
-		openssl dgst -sha256 "$_cd_file" | awk '{print $2}'
-	else
-		return 1
-	fi
-	unset _cd_file
-}
-
-cache_download_text_sha256() {
-	_cd_tmp="${TMPDIR:-/tmp}/kamfw.cache-download.text.$$"
-	printf '%s' "$1" >"$_cd_tmp" || return 1
-	_cd_hash="$(cache_download_sha256 "$_cd_tmp" 2>/dev/null || true)"
-	rm -f "$_cd_tmp" 2>/dev/null || true
-	[ -n "$_cd_hash" ] || return 1
-	printf '%s\n' "$_cd_hash"
-	unset _cd_tmp _cd_hash
-}
-
-cache_download_state_dir() {
-	_cd_home="${KAM_HOME:-${MODDIR:-${MODPATH:-/tmp}}}"
-	_cd_dir="${KAM_CACHE_DOWNLOAD_STATE_DIR:-$_cd_home/.cache/downloads}"
-	mkdir -p "$_cd_dir" 2>/dev/null || return 1
-	printf '%s\n' "$_cd_dir"
-	unset _cd_home _cd_dir
-}
-
-cache_download_hash_file() {
-	_cd_url="$1"
-	_cd_dest="$2"
-	_cd_dir="$(cache_download_state_dir)" || return 1
-	_cd_key="$(cache_download_text_sha256 "$_cd_url|$_cd_dest" 2>/dev/null || true)"
-	[ -n "$_cd_key" ] || return 1
-	printf '%s/%s.sha256\n' "$_cd_dir" "$_cd_key"
-	unset _cd_url _cd_dest _cd_dir _cd_key
-}
-
-cache_download_parse_hash() {
-	sed -n 's/.*\([0-9a-fA-F]\{64\}\).*/\1/p' | head -n1 | tr '[:upper:]' '[:lower:]'
-}
-
-cache_download_remote_hash() {
-	_cd_hash_url="$1"
-	cache_download_require curl || return 1
-	curl -fsSL "$_cd_hash_url" | cache_download_parse_hash
-	unset _cd_hash_url
-}
+_cache_download_transaction() (
+    expected=''
+    hash_url=''
+    hash_file=''
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --hash|--hash-url|--hash-file)
+                [ $# -ge 2 ] || return 2
+                case "$1" in
+                    --hash) expected=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]') ;;
+                    --hash-url) hash_url=$2 ;;
+                    --hash-file) hash_file=$2 ;;
+                esac
+                shift 2
+                ;;
+            -h|--help) print 'Usage: cache_download [--hash SHA256 | --hash-url URL] [--hash-file FILE] <url> <dest>'; return 3 ;;
+            *) break ;;
+        esac
+    done
+    url=${1:-}
+    dest=${2:-}
+    [ -n "$url" ] || { error "$(i18n CACHE_DOWNLOAD_MISSING_URL)"; return 1; }
+    [ -n "$dest" ] || { error "$(i18n CACHE_DOWNLOAD_MISSING_DEST)"; return 1; }
+    cache_download_require curl || return 1
+    [ -n "$hash_file" ] || hash_file=$(cache_download_hash_file "$url" "$dest") || return 1
+    mkdir -p "$(dirname "$dest")" "$(dirname "$hash_file")" || return 1
+    if [ -n "$hash_url" ]; then
+        expected=$(cache_download_remote_hash "$hash_url") || { error "$(i18n CACHE_DOWNLOAD_DOWNLOAD_FAILED | t "$hash_url")"; return 1; }
+    fi
+    current=''
+    [ ! -f "$dest" ] || current=$(cache_download_sha256 "$dest") || return 1
+    if [ -n "$expected" ] && [ "$current" = "$expected" ] && [ -f "$hash_file" ]; then
+        info "$(i18n CACHE_DOWNLOAD_UP_TO_DATE | t "$dest")"
+        return 3
+    fi
+    temporary=$(mktemp "$(dirname "$dest")/.${dest##*/}.kamfw-download.XXXXXX") || return 1
+    trap 'rm -f "$temporary"' EXIT
+    curl -fsSL --connect-timeout 10 --max-time 60 -o "$temporary" "$url" || {
+        error "$(i18n CACHE_DOWNLOAD_DOWNLOAD_FAILED | t "$url")"; return 1;
+    }
+    digest=$(cache_download_sha256 "$temporary") || { error "$(i18n CACHE_DOWNLOAD_HASH_FAILED | t "$temporary")"; return 1; }
+    if [ -n "$expected" ] && [ "$digest" != "$expected" ]; then
+        error "$(i18n CACHE_DOWNLOAD_HASH_MISMATCH | t "$digest" "$expected")"
+        return 1
+    fi
+    if [ "$digest" = "$current" ] && [ -f "$hash_file" ]; then
+        info "$(i18n CACHE_DOWNLOAD_UP_TO_DATE | t "$dest")"
+        return 3
+    fi
+    mv -f "$temporary" "$dest" || return 1
+    printf '%s\n' "$digest" >"$hash_file" 2>/dev/null || true
+    success "$(i18n CACHE_DOWNLOAD_UPDATED | t "$dest")"
+)
 
 cache_download() {
-	_cd_expected=""
-	_cd_hash_url=""
-	_cd_hash_file=""
-
-	while [ $# -gt 0 ]; do
-		case "$1" in
-		--hash)
-			_cd_expected="$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')"
-			shift 2
-			;;
-		--hash-url)
-			_cd_hash_url="$2"
-			shift 2
-			;;
-		--hash-file)
-			_cd_hash_file="$2"
-			shift 2
-			;;
-		--help | -h)
-			print "Usage: cache_download [--hash SHA256 | --hash-url URL] [--hash-file FILE] <url> <dest>"
-			return 0
-			;;
-		*) break ;;
-		esac
-	done
-
-	_cd_url="${1:-}"
-	_cd_dest="${2:-}"
-	if [ -z "$_cd_url" ]; then
-		error "$(cache_download_msg CACHE_DOWNLOAD_MISSING_URL "cache_download: url is required")"
-		return 1
-	fi
-	if [ -z "$_cd_dest" ]; then
-		error "$(cache_download_msg CACHE_DOWNLOAD_MISSING_DEST "cache_download: destination file is required")"
-		return 1
-	fi
-
-	cache_download_require curl || return 1
-	mkdir -p "$(dirname "$_cd_dest")" 2>/dev/null || return 1
-
-	if [ -z "$_cd_hash_file" ]; then
-		_cd_hash_file="$(cache_download_hash_file "$_cd_url" "$_cd_dest")" || return 1
-	fi
-	mkdir -p "$(dirname "$_cd_hash_file")" 2>/dev/null || return 1
-
-	if [ -n "$_cd_hash_url" ]; then
-		_cd_remote_hash="$(cache_download_remote_hash "$_cd_hash_url" 2>/dev/null || true)"
-		[ -n "$_cd_remote_hash" ] && _cd_expected="$_cd_remote_hash"
-	fi
-
-	if [ -n "$_cd_expected" ] && [ -f "$_cd_hash_file" ] && [ -f "$_cd_dest" ]; then
-		_cd_cached="$(cat "$_cd_hash_file" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
-		_cd_current="$(cache_download_sha256 "$_cd_dest" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
-		if [ "$_cd_cached" = "$_cd_expected" ] && [ "$_cd_current" = "$_cd_expected" ]; then
-			export KAM_CACHE_DOWNLOAD_CHANGED=0
-			info "$(cache_download_msg CACHE_DOWNLOAD_UP_TO_DATE "cache_download: up to date: $_cd_dest" "$_cd_dest")"
-			return 0
-		fi
-	fi
-
-	_cd_tmp="$(dirname "$_cd_dest")/.$(basename "$_cd_dest").kamfw-download.$$"
-	rm -f "$_cd_tmp" 2>/dev/null || true
-	if ! curl -fsSL -o "$_cd_tmp" "$_cd_url"; then
-		rm -f "$_cd_tmp" 2>/dev/null || true
-		error "$(cache_download_msg CACHE_DOWNLOAD_DOWNLOAD_FAILED "cache_download: download failed: $_cd_url" "$_cd_url")"
-		return 1
-	fi
-
-	_cd_new_hash="$(cache_download_sha256 "$_cd_tmp" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
-	if [ -z "$_cd_new_hash" ]; then
-		rm -f "$_cd_tmp" 2>/dev/null || true
-		error "$(cache_download_msg CACHE_DOWNLOAD_HASH_FAILED "cache_download: cannot compute sha256: $_cd_tmp" "$_cd_tmp")"
-		return 1
-	fi
-
-	if [ -n "$_cd_expected" ] && [ "$_cd_new_hash" != "$_cd_expected" ]; then
-		rm -f "$_cd_tmp" 2>/dev/null || true
-		error "$(cache_download_msg CACHE_DOWNLOAD_HASH_MISMATCH "cache_download: sha256 mismatch" "$_cd_new_hash" "$_cd_expected")"
-		return 1
-	fi
-
-	if [ -f "$_cd_hash_file" ] && [ -f "$_cd_dest" ]; then
-		_cd_cached="$(cat "$_cd_hash_file" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
-		if [ "$_cd_cached" = "$_cd_new_hash" ]; then
-			rm -f "$_cd_tmp" 2>/dev/null || true
-			export KAM_CACHE_DOWNLOAD_CHANGED=0
-			info "$(cache_download_msg CACHE_DOWNLOAD_UP_TO_DATE "cache_download: up to date: $_cd_dest" "$_cd_dest")"
-			return 0
-		fi
-	fi
-
-	mv -f "$_cd_tmp" "$_cd_dest" || {
-		rm -f "$_cd_tmp" 2>/dev/null || true
-		return 1
-	}
-	printf '%s\n' "$_cd_new_hash" >"$_cd_hash_file" 2>/dev/null || true
-	export KAM_CACHE_DOWNLOAD_CHANGED=1
-	success "$(cache_download_msg CACHE_DOWNLOAD_UPDATED "cache_download: updated: $_cd_dest" "$_cd_dest")"
+    export KAM_CACHE_DOWNLOAD_CHANGED=0
+    if _cache_download_transaction "$@"; then
+        export KAM_CACHE_DOWNLOAD_CHANGED=1
+    else
+        _cd_result=$?
+        [ "$_cd_result" -eq 3 ] || return "$_cd_result"
+    fi
 }
-
-download_if_changed() {
-	cache_download "$@"
-}
-
-cache_download_if_changed() {
-	cache_download "$@"
-}
+download_if_changed() { cache_download "$@"; }
+cache_download_if_changed() { cache_download "$@"; }

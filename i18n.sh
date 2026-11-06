@@ -61,28 +61,28 @@ _kamfw_i18n_table_pass() {
         if [ -z "$_lt_langs" ]; then
             case "$_lt_line" in
                 KEY\|*)
-                    _lt_langs=${_lt_line#KEY|}
+                    _lt_langs=${_lt_line#KEY\|}
                     case "$_lt_langs" in ''|\|*|*\||*\|\|*) return 1 ;; esac
                     _lt_rest=$_lt_langs
                     while :; do
-                        _kamfw_i18n_lang_is_safe "${_lt_rest%%|*}" || return 1
-                        case "$_lt_rest" in *\|*) _lt_rest=${_lt_rest#*|} ;; *) break ;; esac
+                        _kamfw_i18n_lang_is_safe "${_lt_rest%%\|*}" || return 1
+                        case "$_lt_rest" in *\|*) _lt_rest=${_lt_rest#*\|} ;; *) break ;; esac
                     done
                     continue
                     ;;
                 *) _lt_langs='zh|en|ja|ko' ;;
             esac
         fi
-        _lt_key=${_lt_line%%|*}
+        _lt_key=${_lt_line%%\|*}
         _kamfw_i18n_key_is_safe "$_lt_key" || return 1
         _lt_rest=$_lt_line
         _lt_languages=$_lt_langs
         while :; do
-            case "$_lt_rest" in *\|*) _lt_rest=${_lt_rest#*|} ;; *) return 1 ;; esac
-            _lt_lang=${_lt_languages%%|*}
-            if [ "$2" = apply ]; then set_i18n "$_lt_key" "$_lt_lang" "${_lt_rest%%|*}" || return 1; fi
+            case "$_lt_rest" in *\|*) _lt_rest=${_lt_rest#*\|} ;; *) return 1 ;; esac
+            _lt_lang=${_lt_languages%%\|*}
+            if [ "$2" = apply ]; then set_i18n "$_lt_key" "$_lt_lang" "${_lt_rest%%\|*}" || return 1; fi
             case "$_lt_languages" in
-                *\|*) _lt_languages=${_lt_languages#*|} ;;
+                *\|*) _lt_languages=${_lt_languages#*\|} ;;
                 *) case "$_lt_rest" in *\|*) return 1 ;; esac; break ;;
             esac
         done

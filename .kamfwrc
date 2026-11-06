@@ -10,7 +10,7 @@ unset _kamfw_rcfile
 NL='
 '
 
-tprint() { if $IS_TTY; then printf '%s\n' "$*"; fi; }
+tprint() { $IS_TTY && printf '%s\n' "$*"; }
 gprint() { if ! $IS_TTY; then printf '%s\n' "$*"; fi; }
 print() {
     if [ "${BOOTMODE:-true}" = true ]; then

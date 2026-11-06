@@ -1,9 +1,4 @@
 # shellcheck shell=ash
-#
-# kamfw Android notification helper
-#
-# Explicit API only. Importing this file must not post notifications.
-
 set_i18n "NOTIFY_TAG_REQUIRED" \
 	"zh" "notify: tag 不能为空" \
 	"en" "notify: tag is required" \
@@ -53,147 +48,79 @@ set_i18n "NOTIFY_EXPAND_FAILED" \
 	"ko" "알림 창 펼치기 실패"
 
 notify_require_cmd() {
-	if ! command -v cmd >/dev/null 2>&1; then
-		error "$(i18n NOTIFY_TOOL_MISSING | t "cmd")"
-		return 1
-	fi
+    command -v cmd >/dev/null 2>&1 || { error "$(i18n NOTIFY_TOOL_MISSING | t cmd)"; return 1; }
 }
-
-notify_quote() {
-	printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"
-}
-
+notify_quote() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 notify_run_as_shell() {
-	_nrs_cmd="$1"
-
-	if [ "${KAM_NOTIFY_AS_SHELL:-1}" != "1" ]; then
-		unset _nrs_cmd
-		return 1
-	fi
-	if ! command -v su >/dev/null 2>&1; then
-		unset _nrs_cmd
-		return 1
-	fi
-
-	su shell -c "$_nrs_cmd" 2>/dev/null
-	_nrs_rc=$?
-	unset _nrs_cmd
-	return "$_nrs_rc"
+    [ "${KAM_NOTIFY_AS_SHELL:-1}" = 1 ] && command -v su >/dev/null 2>&1 || return 1
+    su shell -c "$1" 2>/dev/null
 }
+
+_notify_post_attempts() (
+    tag=$1 title=$2 text=$3
+    style=${KAM_NOTIFY_STYLE:-bigtext}
+    icon=${KAM_NOTIFY_ICON:-@android:drawable/stat_notify_error}
+    for runner in shell direct; do
+        for with_icon in yes no; do
+            set -- cmd notification post
+            [ "${KAM_NOTIFY_VERBOSE:-0}" != 1 ] || set -- "$@" -v
+            set -- "$@" -S "$style"
+            [ "$with_icon" != yes ] || set -- "$@" -i "$icon"
+            set -- "$@" -t "$title" "$tag" "$text"
+            if [ "$runner" = direct ]; then
+                "$@" && return 0
+            else
+                command=''
+                for argument in "$@"; do command="$command $(notify_quote "$argument")"; done
+                notify_run_as_shell "$command" && return 0
+            fi
+        done
+    done
+    return 1
+)
 
 notify_post_cmd() {
-	_npc_tag="$1"
-	_npc_title="$2"
-	_npc_text="$3"
-	_npc_icon="${KAM_NOTIFY_ICON:-@android:drawable/stat_notify_error}"
-	_npc_style="${KAM_NOTIFY_STYLE:-bigtext}"
-	_npc_verbose_arg=""
-	[ "${KAM_NOTIFY_VERBOSE:-0}" = "1" ] && _npc_verbose_arg="-v "
-	_npc_cmd="cmd notification post ${_npc_verbose_arg}-S $(notify_quote "$_npc_style") -i $(notify_quote "$_npc_icon") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
-	_npc_fallback_cmd="cmd notification post ${_npc_verbose_arg}-S $(notify_quote "$_npc_style") -t $(notify_quote "$_npc_title") $(notify_quote "$_npc_tag") $(notify_quote "$_npc_text")"
-
-	if [ "${KAM_NOTIFY_VERBOSE:-0}" = "1" ]; then
-		notify_run_as_shell "$_npc_cmd"
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || notify_run_as_shell "$_npc_fallback_cmd"
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || cmd notification post -v -S "$_npc_style" -i "$_npc_icon" -t "$_npc_title" "$_npc_tag" "$_npc_text"
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || cmd notification post -v -S "$_npc_style" -t "$_npc_title" "$_npc_tag" "$_npc_text"
-		_npc_rc=$?
-	else
-		notify_run_as_shell "$_npc_cmd" >/dev/null 2>&1
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || notify_run_as_shell "$_npc_fallback_cmd" >/dev/null 2>&1
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || cmd notification post -S "$_npc_style" -i "$_npc_icon" -t "$_npc_title" "$_npc_tag" "$_npc_text" >/dev/null 2>&1
-		_npc_rc=$?
-		[ "$_npc_rc" -eq 0 ] || cmd notification post -S "$_npc_style" -t "$_npc_title" "$_npc_tag" "$_npc_text" >/dev/null 2>&1
-		_npc_rc=$?
-	fi
-
-	unset _npc_tag _npc_title _npc_text _npc_icon _npc_style _npc_verbose_arg _npc_cmd _npc_fallback_cmd
-	return "$_npc_rc"
+    if [ "${KAM_NOTIFY_VERBOSE:-0}" = 1 ]; then _notify_post_attempts "$@"
+    else _notify_post_attempts "$@" >/dev/null 2>&1; fi
 }
 
 notify_post() {
-	_nt_tag="$1"
-	_nt_title="$2"
-	shift 2 2>/dev/null || true
-	_nt_text="$*"
-
-	[ -z "$_nt_tag" ] && {
-		error "$(i18n NOTIFY_TAG_REQUIRED)"
-		return 2
-	}
-	[ -z "$_nt_title" ] && {
-		error "$(i18n NOTIFY_TITLE_REQUIRED)"
-		unset _nt_tag _nt_title _nt_text
-		return 2
-	}
-	[ -z "$_nt_text" ] && {
-		error "$(i18n NOTIFY_TEXT_REQUIRED)"
-		unset _nt_tag _nt_title _nt_text
-		return 2
-	}
-	notify_require_cmd || {
-		unset _nt_tag _nt_title _nt_text
-		return 1
-	}
-
-	if notify_post_cmd "$_nt_tag" "$_nt_title" "$_nt_text"; then
-		success "$(i18n NOTIFY_POSTED | t "$_nt_tag")"
-		unset _nt_tag _nt_title _nt_text
-		return 0
-	fi
-
-	error "$(i18n NOTIFY_POST_FAILED | t "$_nt_tag")"
-	unset _nt_tag _nt_title _nt_text
-	return 1
+    [ -n "${1:-}" ] || { error "$(i18n NOTIFY_TAG_REQUIRED)"; return 2; }
+    [ -n "${2:-}" ] || { error "$(i18n NOTIFY_TITLE_REQUIRED)"; return 2; }
+    _np_tag=$1 _np_title=$2
+    shift 2
+    [ -n "$*" ] || { error "$(i18n NOTIFY_TEXT_REQUIRED)"; return 2; }
+    notify_require_cmd || return 1
+    if notify_post_cmd "$_np_tag" "$_np_title" "$*"; then
+        success "$(i18n NOTIFY_POSTED | t "$_np_tag")"
+    else
+        error "$(i18n NOTIFY_POST_FAILED | t "$_np_tag")"
+        return 1
+    fi
 }
 
 notify_expand() {
-	notify_require_cmd || return 1
-	if cmd statusbar expand-notifications >/dev/null 2>&1; then
-		success "$(i18n NOTIFY_EXPANDED)"
-		return 0
-	fi
-	error "$(i18n NOTIFY_EXPAND_FAILED)"
-	return 1
+    notify_require_cmd || return 1
+    if cmd statusbar expand-notifications >/dev/null 2>&1; then success "$(i18n NOTIFY_EXPANDED)"
+    else error "$(i18n NOTIFY_EXPAND_FAILED)"; return 1; fi
 }
-
 notify_alert() {
-	notify_post "$@"
-	_nt_rc=$?
-	[ "$_nt_rc" -eq 0 ] && notify_expand >/dev/null 2>&1 || true
-	return "$_nt_rc"
+    notify_post "$@" || return $?
+    notify_expand >/dev/null 2>&1 || true
 }
-
-notify_test() {
-	_nt_now="$(date +%H:%M:%S 2>/dev/null || printf '%s' "now")"
-	notify_alert "kamfw_notify_test" "Kam Test" "kamfw notification test at $_nt_now"
-	_nt_rc=$?
-	unset _nt_now
-	return "$_nt_rc"
-}
-
+notify_test() { notify_alert kamfw_notify_test 'Kam Test' "kamfw notification test at $(date +%H:%M:%S)"; }
 notify() {
-	_nt_action="$1"
-	shift || true
-	case "$_nt_action" in
-	post) notify_post "$@" ;;
-	alert) notify_alert "$@" ;;
-	expand) notify_expand ;;
-	test) notify_test ;;
-	*)
-		print "Usage: notify post <tag> <title> <text...>"
-		print "       notify alert <tag> <title> <text...>"
-		print "       notify expand"
-		print "       notify test"
-		return 2
-		;;
-	esac
-	_nt_rc=$?
-	unset _nt_action
-	return "$_nt_rc"
+    case "${1:-}" in
+        post) shift; notify_post "$@" ;;
+        alert) shift; notify_alert "$@" ;;
+        expand) notify_expand ;;
+        test) notify_test ;;
+        *)
+            print 'Usage: notify post <tag> <title> <text...>'
+            print '       notify alert <tag> <title> <text...>'
+            print '       notify expand'
+            print '       notify test'
+            return 2
+            ;;
+    esac
 }

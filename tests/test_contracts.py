@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -10,12 +11,13 @@ import unittest
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--baseline', type=Path)
+parser.add_argument('--shell', default='sh')
 args, remaining = parser.parse_known_args()
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = args.baseline.resolve() if args.baseline else None
 
 
-def run(root, body, files=None, collect=()):
+def run(root, body, files=None, collect=(), timeout=20):
     with tempfile.TemporaryDirectory(prefix='kamfw-contract-') as tmp:
         tmp = Path(tmp)
         module = tmp / 'module'
@@ -30,8 +32,8 @@ def run(root, body, files=None, collect=()):
         env = dict(os.environ, MODDIR=str(module), MODPATH=str(module), FIXTURE=str(tmp),
                    IMPL=str(root), TMPDIR=str(tmp), KAM_UI_LANGUAGE='en')
         program = '. "$IMPL/.kamfwrc" || exit $?\n' + body
-        result = subprocess.run(['sh', '-c', program], cwd=tmp, env=env,
-                                capture_output=True, text=True, timeout=20)
+        result = subprocess.run(shlex.split(args.shell) + ['-c', program], cwd=tmp, env=env,
+                                capture_output=True, text=True, timeout=timeout)
         normalize = lambda s: s.replace(str(tmp), '<fixture>').replace(str(root), '<kamfw>')
         snapshot = {}
         for name in collect:
@@ -48,7 +50,7 @@ set_i18n QUOTE en 'line one\n$HOME & | \\ literal'
 KAM_UI_LANGUAGE=en i18n QUOTE
 printf '%s\\n' 'Hello $_1 / $_2 / $_1' | t 'a & b | c' 'quoted " text'
 ''', {}, ()),
-    'i18n_table': ('''load_i18n "$FIXTURE/table"
+    'i18n_table': ('''load_i18n "$FIXTURE/table" || exit 1
 KAM_UI_LANGUAGE=zh i18n ROW
 KAM_UI_LANGUAGE=ja i18n ROW
 KAM_UI_LANGUAGE=en i18n EMPTY
@@ -172,6 +174,129 @@ launch browser 'https://example.test/a'
 }
 
 
+CASES.update({
+    'config_precedence_and_deletion': (r'''import self
+is_ksu() { return 1; }
+config set key persistent
+config set --temp key temporary
+config set other 'with spaces'
+config get key; printf '\n'
+config list
+config delete --temp key
+config get key; printf '\n'
+config clear
+config get key; printf 'missing:%s\n' "$?"
+disable; test -f "$MODDIR/disable"
+enable; test ! -f "$MODDIR/disable"
+''', {}, ()),
+    'config_stdin': (r'''import self
+is_ksu() { return 1; }
+printf 'one\ntwo\n' | config set --stdin text
+config get text
+''', {}, ()),
+    'notify_direct_fallback': (r'''import notify
+success() { :; }
+su() { return 1; }
+cmd() {
+    printf '<%s>' "$@" >>"$FIXTURE/notify.calls"
+    printf '\n' >>"$FIXTURE/notify.calls"
+    case "$*" in *' -i '*) return 1 ;; esac
+}
+notify alert tag "Title with 'quote'" 'Body & literal $text' second
+''', {}, ('notify.calls',)),
+    'notify_shell_and_validation': (r'''import notify
+success() { :; }
+error() { printf '%s\n' "$1"; }
+cmd() { printf '<%s>' "$@" >>"$FIXTURE/notify.calls"; printf '\n' >>"$FIXTURE/notify.calls"; }
+su() { eval "$3"; }
+notify post tag Title 'One two'
+notify post '' Title body; printf 'code:%s\n' "$?"
+notify post tag '' body; printf 'code:%s\n' "$?"
+notify post tag Title ''; printf 'code:%s\n' "$?"
+''', {}, ('notify.calls',)),
+    'cache_download_transactions': (r'''import cache_download
+info() { :; }; success() { :; }; error() { printf '%s\n' "$1"; }
+curl() {
+    output=''
+    while [ $# -gt 0 ]; do
+        case "$1" in -o) output=$2; shift 2 ;; --connect-timeout|--max-time) shift 2 ;; *) shift ;; esac
+    done
+    if [ -n "$output" ]; then cp "$FIXTURE/remote" "$output"; else cat "$FIXTURE/remote.hash"; fi
+}
+expected=$(cache_download_sha256 "$FIXTURE/remote")
+printf '%s\n' "$expected" >"$FIXTURE/remote.hash"
+cache_download --hash-file "$FIXTURE/digest" https://example.test "$FIXTURE/dest"
+printf 'changed:%s\n' "$KAM_CACHE_DOWNLOAD_CHANGED"
+cache_download --hash-file "$FIXTURE/digest" https://example.test "$FIXTURE/dest"
+printf 'changed:%s\n' "$KAM_CACHE_DOWNLOAD_CHANGED"
+cache_download --hash "$expected" --hash-file "$FIXTURE/digest" https://example.test "$FIXTURE/dest"
+printf 'changed:%s\n' "$KAM_CACHE_DOWNLOAD_CHANGED"
+cache_download --hash-url https://example.test/hash --hash-file "$FIXTURE/digest" https://example.test "$FIXTURE/dest"
+printf 'changed:%s\n' "$KAM_CACHE_DOWNLOAD_CHANGED"
+cache_download --hash 0000000000000000000000000000000000000000000000000000000000000000 --hash-file "$FIXTURE/digest" https://example.test "$FIXTURE/dest"
+printf 'mismatch:%s\n' "$?"
+''', {'remote': 'download body\n'}, ('dest', 'digest')),
+    'watcher_snapshots_and_changes': (r'''import fswatch
+KAM_FSWATCH_PRUNE_NAMES='generated stage'
+fswatch_snapshot "$FIXTURE/tree"
+fswatch_changed "$FIXTURE/tree" "$FIXTURE/snapshot"; printf 'initial:%s\n' "$?"
+fswatch_changed "$FIXTURE/tree" "$FIXTURE/snapshot"; printf 'same:%s\n' "$?"
+printf changed >"$FIXTURE/tree/generated/ignored"
+fswatch_changed "$FIXTURE/tree" "$FIXTURE/snapshot"; printf 'pruned:%s\n' "$?"
+printf changed >"$FIXTURE/tree/input"
+fswatch_changed "$FIXTURE/tree" "$FIXTURE/snapshot"; printf 'edited:%s\n' "$?"
+''', {'tree/input': 'body', 'tree/with space/child': 'data', 'tree/generated/ignored': 'output', 'tree/stage/ignored': 'stage'}, ()),
+    'watchdog_once_and_validation': (r'''import watchdog
+watchdog once 'printf "body\\n"; exit 37'; printf 'code:%s\n' "$?"
+for interval in 0 1 05 -1 1.5 x ''; do
+    watchdog_valid_interval "$interval"; printf '%s:%s\n' "$interval" "$?"
+done
+''', {}, ()),
+    'rich_layout': (r'''import rich
+COL_CYN='' COL_GRN='' COL_YLW='' COL_RED='' COL_RST=''
+__rich_terminal_width() { printf 24; }
+panel Heading
+panel_row Key 'some value'
+panel_note Note
+panel_success Done
+panel_warn Warning
+panel_error Error
+panel_end
+panel_line content
+panel_divider
+panel_status success healthy
+guide first second
+__rich_pad_right text 8; printf '\n'
+''', {}, ()),
+    'rich_prompt_selection': (r'''import rich
+COL_CYN='' COL_GRN='' COL_YLW='' COL_RED='' COL_RST=''
+wait_key_up_down() { printf up; }
+ask 'Choose an option' 'First option' 'printf "selected:first\\n"' 'Second option' 'printf "selected:second\\n"' 1
+''', {}, ()),
+    'logging_lines_and_ansi': (r'''date() { printf '2026-01-02 03:04:05\n'; }
+log -f "$FIXTURE/test.log" 'first message'
+printf '\033[31mred\033[0m\nlast without newline' | log -f "$FIXTURE/test.log"
+log -w -f "$FIXTURE/overwrite.log" old
+log -w -f "$FIXTURE/overwrite.log" new
+''', {}, ('test.log', 'overwrite.log')),
+    'property_conditional_updates': (r'''import prop
+info() { :; }
+resetprop() {
+    if [ $# = 1 ]; then cat "$FIXTURE/property"
+    elif [ "$1" = --delete ]; then : >"$FIXTURE/property"
+    else printf '%s' "$3" >"$FIXTURE/property"; fi
+}
+resetprop_if_diff test.prop old
+cat "$FIXTURE/property"; printf '\n'
+resetprop_if_match test.prop old new
+cat "$FIXTURE/property"; printf '\n'
+resetprop_if_match test.prop absent unchanged
+cat "$FIXTURE/property"; printf '\n'
+delprop_if_exist test.prop
+''', {'property': 'old'}, ('property',)),
+})
+
+
 class Contracts(unittest.TestCase):
     def test_public_contracts(self):
         for name, (body, files, collect) in CASES.items():
@@ -179,7 +304,13 @@ class Contracts(unittest.TestCase):
                 actual = run(ROOT, body, files, collect)
                 self.assertEqual(actual['code'], 0, actual)
                 if BASELINE:
-                    self.assertEqual(actual, run(BASELINE, body, files, collect))
+                    if name == 'i18n_table' and Path(shlex.split(args.shell)[0]).name == 'mksh':
+                        # Baseline treats unescaped | as pattern alternation and loops forever.
+                        self.assertEqual(actual['stdout'], '中文\nfallback\nEMPTY\n')
+                        with self.assertRaises(subprocess.TimeoutExpired):
+                            run(BASELINE, body, files, collect, timeout=2)
+                    else:
+                        self.assertEqual(actual, run(BASELINE, body, files, collect))
 
     def test_nested_import_registration(self):
         result = run(ROOT, '''import __singbox__
